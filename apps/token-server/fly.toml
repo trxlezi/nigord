@@ -1,0 +1,31 @@
+# fly.toml — run every command from the REPO ROOT:
+#   fly deploy --config apps/token-server/fly.toml --dockerfile apps/token-server/Dockerfile
+#
+# The context has to be the repo root because pnpm needs the workspace manifest
+# and the lockfile, which live above this directory.
+#
+# NOT VERIFIED: flyctl is not installed on the development machine. Change
+# `app` to the name `fly launch` gives you.
+
+app = "nigord-token"
+primary_region = "gru"  # São Paulo — closest to the group
+
+[env]
+  HOST = "0.0.0.0"
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  # Zero is deliberate: this serves six friends a handful of times a day, and a
+  # suspended machine resumes in well under a second. Keeping one warm would
+  # spend the free allowance on nothing.
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"

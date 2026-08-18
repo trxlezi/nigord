@@ -1,0 +1,113 @@
+# Implantar o token server
+
+O aplicativo não funciona sem este serviço: ele é quem guarda as chaves do
+LiveKit e emite as credenciais de sala. Nenhum participante precisa dele
+instalado — só precisa do endereço e do segredo do grupo.
+
+> **Nada aqui foi executado.** A máquina de desenvolvimento não tem Docker nem
+> `flyctl`, então a imagem nunca foi construída e o deploy nunca rodou. Os
+> comandos abaixo são o caminho pretendido, não um caminho verificado. Trate o
+> primeiro deploy como o teste — e veja "Se falhar" no fim.
+
+## 1. Chaves do LiveKit
+
+Crie um projeto no [LiveKit Cloud](https://cloud.livekit.io) e anote:
+
+- `LIVEKIT_URL` — algo como `wss://seu-projeto.livekit.cloud`
+- `LIVEKIT_API_KEY`
+- `LIVEKIT_API_SECRET`
+
+Essas três **nunca** saem do servidor. Não vão para o `.exe`, não vão para o
+repositório (specs/room-access, "Proteção das chaves do serviço de mídia").
+
+## 2. Segredo do grupo
+
+É o que o app apresenta para pedir uma credencial. Gere um valor aleatório —
+qualquer coisa com pelo menos 8 caracteres serve, mas não escolha à mão:
+
+```bash
+openssl rand -base64 24
+```
+
+Esse valor você passa para cada amigo, e cada um cola na tela de configuração
+do app. Quem tem o segredo consegue entrar em qualquer sala; trocar é só
+atualizar o servidor e avisar o grupo.
+
+## 3. Deploy no Fly.io
+
+Do **diretório raiz do repositório**:
+
+```bash
+fly auth login
+fly launch --config apps/token-server/fly.toml --no-deploy
+```
+
+`fly launch` vai propor um nome — se aceitar um diferente de `nigord-token`,
+ele mesmo atualiza o `app` no `fly.toml`.
+
+Depois configure os segredos (eles ficam no Fly, nunca no repositório):
+
+```bash
+fly secrets set \
+  LIVEKIT_URL="wss://seu-projeto.livekit.cloud" \
+  LIVEKIT_API_KEY="..." \
+  LIVEKIT_API_SECRET="..." \
+  NIGORD_GROUP_SECRET="..." \
+  --config apps/token-server/fly.toml
+```
+
+E implante:
+
+```bash
+fly deploy --config apps/token-server/fly.toml --dockerfile apps/token-server/Dockerfile
+```
+
+## 4. Conferir
+
+```bash
+curl https://<seu-app>.fly.dev/health
+# {"ok":true}
+```
+
+E que ele recusa quem não tem o segredo:
+
+```bash
+curl -s -X POST https://<seu-app>.fly.dev/token \
+  -H 'content-type: application/json' \
+  -d '{"room":"sala-principal","identity":"teste"}'
+# {"code":"unauthorized","message":"Invalid or missing group secret."}
+```
+
+Se as duas respostas vierem assim, o serviço está pronto. O endereço
+(`https://<seu-app>.fly.dev`) e o segredo do grupo são o que cada participante
+digita na primeira execução do app.
+
+## Se falhar
+
+O ponto mais provável de quebra é o `pnpm install` dentro da imagem: o
+`Dockerfile` copia o manifesto do workspace, o lockfile e apenas os dois
+pacotes de que este serviço depende. Se a instalação reclamar de um pacote
+ausente, é porque uma dependência nova entrou no workspace e precisa ser
+copiada também.
+
+O serviço falha ao iniciar de propósito quando falta qualquer chave, com a
+mensagem dizendo qual — `fly logs` mostra exatamente essa linha.
+
+## Alternativa sem deploy
+
+Para um teste rápido, um túnel da máquina de desenvolvimento resolve, sem
+conta de hospedagem nenhuma:
+
+```bash
+LIVEKIT_URL="wss://seu-projeto.livekit.cloud" \
+LIVEKIT_API_KEY="..." \
+LIVEKIT_API_SECRET="..." \
+NIGORD_GROUP_SECRET="..." \
+pnpm dev:server
+
+cloudflared tunnel --url http://localhost:3000
+```
+
+O endereço `https://...trycloudflare.com` que ele imprime é o que vai na tela
+de configuração do app. Só vale enquanto a máquina estiver ligada com o túnel
+aberto.
