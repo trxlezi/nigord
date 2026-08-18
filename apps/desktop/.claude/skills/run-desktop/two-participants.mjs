@@ -1,4 +1,5 @@
-// Two participants in one room — the only way to test what a call actually is.
+// Two participants in one room, walking the multi-party scenarios from
+// specs/screen-sharing end to end.
 //
 // Bugs found by this script that a single instance CANNOT surface: the roster
 // only listing people who joined after you, and the sharer not being marked as
@@ -115,6 +116,7 @@ const joinAs = async (evaluate, name) => {
 };
 
 const procs = [];
+let failed = false;
 try {
   procs.push(launch(9500, null));
   procs.push(launch(9501, '/tmp/nigord-participante-b'));
@@ -136,8 +138,6 @@ try {
     JSON.stringify(await b.evaluate("document.querySelector('.roster')?.innerText")),
   );
 
-  // A shares its screen. Every step is asserted: a positional selector that
-  // silently misses would look exactly like a broken app.
   const clickText = (text) => `
     (() => {
       const els = [...document.querySelectorAll('button')];
@@ -150,92 +150,120 @@ try {
 
   const waitFor = async (target, selector, label, tries = 60) => {
     for (let i = 0; i < tries; i++) {
-      if (await target.evaluate(`!!document.querySelector(${JSON.stringify(selector)})`)) {
-        console.log(`${label}: apareceu em ~${(i * 0.4).toFixed(1)}s`);
+      if (await target.evaluate(`!!document.querySelector(${JSON.stringify(selector)})`))
         return true;
-      }
       await sleep(400);
     }
-    console.log(`${label}: TIMEOUT`);
+    console.log(`  ${label}: TIMEOUT`);
     return false;
   };
 
-  console.log('A clica Compartilhar tela:', await a.evaluate(clickText('Compartilhar tela')));
-  await waitFor(a, '.picker', 'picker em A');
-  // Each xvfb-run gets its own display, so the only capturable source is this
-  // app's own window — and it is not mapped the instant the picker opens.
-  // Waiting for the thumbnail, not just the dialog, is what makes this stable.
-  if (!(await waitFor(a, '.thumb', 'fonte de captura'))) {
-    console.log('nenhuma fonte apareceu; abortando antes de medir o que não existe');
-    process.exit(1);
-  }
-  await a.evaluate(`document.querySelector('.thumb')?.click()`);
-  await sleep(500);
-  console.log(
-    'A confirma:',
-    await a.evaluate(`
-    (() => {
-      const el = [...document.querySelectorAll('.picker__actions button')]
-        .find(x => x.textContent.includes('Compartilhar'));
-      if (!el) return 'NAO_ACHOU';
-      if (el.disabled) return 'DESABILITADO';
-      el.click(); return 'ok';
-    })()`),
-  );
-  await sleep(6000);
-  console.log(
-    'controles de A:',
-    JSON.stringify(await a.evaluate("document.querySelector('.controls')?.innerText")),
-  );
-  console.log(
-    'erro de compartilhamento em A:',
-    JSON.stringify(await a.evaluate("document.querySelector('.alert')?.innerText ?? '(nenhum)'")),
-  );
-  console.log(
-    'roster de A:',
-    JSON.stringify(await a.evaluate("document.querySelector('.roster')?.innerText")),
-  );
-  console.log('esperando chegar em B...');
-  await sleep(6000);
+  /**
+   * Every step is asserted. A positional selector that silently misses looks
+   * exactly like a broken app — that mistake cost an entire debugging session.
+   */
+  const share = async (who, label) => {
+    await who.evaluate(clickText('Compartilhar tela'));
+    if (!(await waitFor(who, '.picker', `picker de ${label}`))) return false;
+    // Each xvfb-run gets its own display, so the only capturable source is the
+    // app's own window — and it is not mapped the instant the picker opens.
+    if (!(await waitFor(who, '.thumb', `fonte de ${label}`))) return false;
+    await who.evaluate(`document.querySelector('.thumb')?.click()`);
+    await sleep(400);
+    await who.evaluate(`
+      (() => {
+        const el = [...document.querySelectorAll('.picker__actions button')]
+          .find(x => x.textContent.includes('Compartilhar'));
+        if (el && !el.disabled) el.click();
+      })()`);
+    await sleep(5000);
+    return true;
+  };
 
-  console.log(
-    'roster de B agora:',
-    JSON.stringify(await b.evaluate("document.querySelector('.roster')?.innerText")),
-  );
-  console.log(
-    'abas de transmissão em B:',
-    JSON.stringify(
-      await b.evaluate("document.querySelector('.viewer__tabs')?.innerText ?? '(sem viewer)'"),
-    ),
-  );
+  const roster = (who) => who.evaluate("document.querySelector('.roster')?.innerText");
+  const tabs = (who) =>
+    who.evaluate("document.querySelector('.viewer__tabs')?.innerText ?? '(sem transmissões)'");
+  const video = (who) =>
+    who.evaluate(`
+      (() => {
+        const v = document.querySelector('video');
+        return v ? { largura: v.videoWidth, altura: v.videoHeight, tocando: !v.paused } : 'sem vídeo';
+      })()`);
 
-  // Watch it and measure the actual video.
+  const results = [];
+  const check = (name, passed, detail) => {
+    results.push({ name, passed });
+    console.log(`  ${passed ? 'PASSOU' : 'FALHOU'} — ${name}${detail ? `: ${detail}` : ''}`);
+  };
+
+  console.log('\n[presença] quem já estava na sala aparece para quem chega depois');
+  const rosterB = await roster(b);
+  check('B vê A, que entrou antes', String(rosterB).includes('trxlezi'), JSON.stringify(rosterB));
+
+  console.log('\n[compartilhar] a mídia chega do outro lado');
+  await share(a, 'A');
+  check('A se vê compartilhando', String(await roster(a)).includes('tela'));
+  const tabsB = await tabs(b);
+  check('B vê a transmissão listada', String(tabsB).includes('trxlezi'), JSON.stringify(tabsB));
   await b.evaluate(`document.querySelector('.viewer__tabs .tab')?.click()`);
-  await sleep(6000);
-  console.log(
-    'vídeo em B:',
-    JSON.stringify(
-      await b.evaluate(`
-    (() => {
-      const v = document.querySelector('video');
-      if (!v) return 'SEM ELEMENTO DE VIDEO';
-      return { largura: v.videoWidth, altura: v.videoHeight, tocando: !v.paused, tempo: v.currentTime };
-    })()
-  `),
-    ),
+  await sleep(5000);
+  const v = await video(b);
+  // The dimensions are the only honest proof: the tab can be there with the
+  // video frozen at zero.
+  check('o vídeo realmente chega em B', typeof v === 'object' && v.largura > 0, JSON.stringify(v));
+
+  console.log('\n[simultâneos] mais de uma transmissão ao mesmo tempo');
+  await share(b, 'B');
+  await sleep(3000);
+  const tabsA = await tabs(a);
+  check('A vê a transmissão de B', String(tabsA).includes('amigo'), JSON.stringify(tabsA));
+  check(
+    'ninguém vê a própria transmissão de volta',
+    !String(await tabs(b)).includes('amigo'),
+    JSON.stringify(await tabs(b)),
   );
 
-  const shot = await b.send('Page.captureScreenshot', { format: 'png' });
+  console.log('\n[ampliado] alternar entre ampliada e reduzida');
+  await b.evaluate(clickText('Ampliar'));
+  await sleep(1200);
+  check('viewer amplia', await b.evaluate("!!document.querySelector('.viewer--expanded')"));
+  check(
+    'painel lateral sai da frente',
+    await b.evaluate(
+      `(() => { const s = document.querySelector('.app__side');
+         return s ? getComputedStyle(s).display === 'none' : false; })()`,
+    ),
+  );
+  await b.evaluate(clickText('Reduzir'));
+  await sleep(800);
+
+  console.log('\n[fim da transmissão] a visualização fecha nos espectadores');
+  await a.evaluate(clickText('Parar de compartilhar'));
+  await sleep(5000);
+  check('B não vê mais a transmissão de A', !String(await tabs(b)).includes('trxlezi'));
+
+  console.log('\n[saída] quem sai desaparece da sala');
+  await a.evaluate(clickText('Sair'));
+  await sleep(5000);
+  check('A some do roster de B', !String(await roster(b)).includes('trxlezi'));
+
   const shotDir = process.env.SCREENSHOT_DIR || '/tmp/nigord-shots';
   mkdirSync(shotDir, { recursive: true });
   const file = join(shotDir, 'dois-participantes.png');
+  const shot = await b.send('Page.captureScreenshot', { format: 'png' });
   writeFileSync(file, Buffer.from(shot.result.data, 'base64'));
-  console.log('screenshot de quem assiste:', file);
+  console.log('\nscreenshot de quem assiste:', file);
+
+  const falhas = results.filter((r) => !r.passed);
+  console.log(`\n${results.length - falhas.length}/${results.length} cenários passaram`);
+  failed = falhas.length > 0;
 } finally {
   for (const p of procs) {
     try {
       process.kill(-p.pid, 'SIGKILL');
-    } catch {}
+    } catch {
+      // already gone
+    }
   }
 }
-process.exit(0);
+process.exit(failed ? 1 : 0);

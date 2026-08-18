@@ -131,9 +131,14 @@ PORT=3300 pnpm --filter @nigord/token-server start   # needs .env at the repo ro
 NIGORD_TOKEN_SERVER=http://127.0.0.1:3300 NIGORD_GROUP_SECRET=<segredo>   node .claude/skills/run-desktop/two-participants.mjs
 ```
 
-It ends with the receiving side's video dimensions — `640x360, tocando: true`
-means the media genuinely arrived. Zeros mean it did not, whatever the interface
-claims.
+It walks ten checks across the multi-party scenarios in `specs/screen-sharing` —
+presence, media actually arriving, simultaneous shares, expanded view, a share
+ending, a participant leaving — printing `PASSOU`/`FALHOU` per check and exiting
+non-zero if any failed.
+
+The media check is the one that matters: it reads the receiving side's
+`videoWidth`. A tab can be listed with the video frozen at zero, so the
+dimensions are the only honest proof that the stream arrived.
 
 Two bugs came out of this that a single instance could never show: the roster
 only listing people who joined _after_ you, and the sharer being the one person
