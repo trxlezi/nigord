@@ -2,7 +2,7 @@
 
 Voz e compartilhamento de tela para grupos pequenos. Um aplicativo desktop para jogar com amigos — sem comunidades, sem chat, sem descoberta. Só o que importa: falar e mostrar a tela, com o áudio do jogo junto.
 
-> **Status:** planejamento. Nenhum código de aplicação ainda — a arquitetura e o escopo estão especificados em [`openspec/changes/bootstrap-nigord-desktop/`](openspec/changes/bootstrap-nigord-desktop/).
+> **Status:** em construção. O token server e o núcleo de sessão estão implementados e testados; o invólucro Electron e a interface ainda não. Progresso em [`tasks.md`](openspec/changes/bootstrap-nigord-desktop/tasks.md).
 
 ## Por que existe
 
@@ -63,11 +63,11 @@ Decisões técnicas e alternativas descartadas em [`design.md`](openspec/changes
 
 ## Plataformas
 
-| | Uso | Desenvolvimento |
-|---|---|---|
-| Windows | ✅ alvo | ✅ |
-| Linux | ❌ | ✅ exceto áudio do sistema e push-to-talk |
-| macOS | ❌ | ❌ |
+|         | Uso     | Desenvolvimento                           |
+| ------- | ------- | ----------------------------------------- |
+| Windows | ✅ alvo | ✅                                        |
+| Linux   | ❌      | ✅ exceto áudio do sistema e push-to-talk |
+| macOS   | ❌      | ❌                                        |
 
 O áudio do sistema depende de captura de loopback, que no Windows o Electron entrega junto do vídeo. No Linux e no macOS o caminho é outro, e o projeto não o persegue.
 
@@ -75,12 +75,12 @@ O áudio do sistema depende de captura de loopback, que no Windows o Electron en
 
 O projeto usa [OpenSpec](https://github.com/Fission-AI/OpenSpec). O comportamento é definido antes do código:
 
-| Arquivo | Conteúdo |
-|---|---|
-| [`proposal.md`](openspec/changes/bootstrap-nigord-desktop/proposal.md) | Por quê, o que muda, escopo |
-| [`specs/`](openspec/changes/bootstrap-nigord-desktop/specs/) | Contratos de comportamento — voz, tela, acesso, invólucro desktop |
-| [`design.md`](openspec/changes/bootstrap-nigord-desktop/design.md) | Decisões técnicas, riscos, alternativas |
-| [`tasks.md`](openspec/changes/bootstrap-nigord-desktop/tasks.md) | Implementação, em ordem de dependência |
+| Arquivo                                                                | Conteúdo                                                          |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`proposal.md`](openspec/changes/bootstrap-nigord-desktop/proposal.md) | Por quê, o que muda, escopo                                       |
+| [`specs/`](openspec/changes/bootstrap-nigord-desktop/specs/)           | Contratos de comportamento — voz, tela, acesso, invólucro desktop |
+| [`design.md`](openspec/changes/bootstrap-nigord-desktop/design.md)     | Decisões técnicas, riscos, alternativas                           |
+| [`tasks.md`](openspec/changes/bootstrap-nigord-desktop/tasks.md)       | Implementação, em ordem de dependência                            |
 
 ```bash
 openspec status --change bootstrap-nigord-desktop
@@ -92,6 +92,19 @@ openspec show bootstrap-nigord-desktop
 Ainda não há release. Quando houver, o instalador estará em [Releases](../../releases).
 
 O executável não é assinado — o Windows exibirá o aviso do SmartScreen na primeira execução. É "Mais informações" → "Executar assim mesmo". Certificado de code signing custa centenas de dólares por ano e não se justifica para um grupo de amigos.
+
+## Desenvolvimento
+
+```bash
+pnpm install
+pnpm check        # lint + typecheck + testes
+pnpm test:watch
+pnpm dev:server   # token server (precisa de .env)
+```
+
+O `packages/core` roda em qualquer sistema — a lógica de sessão é testada sem
+abrir uma janela Electron. Uma regra de lint impede que `core`, `shared` e `ui`
+importem Electron ou APIs do Node, que é o que mantém essa propriedade.
 
 ## Licença
 

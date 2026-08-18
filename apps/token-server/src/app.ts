@@ -21,11 +21,7 @@ function secretMatches(provided: string, expected: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-function errorBody(
-  code: TokenError['code'],
-  message: string,
-  retryAfter?: number,
-): TokenError {
+function errorBody(code: TokenError['code'], message: string, retryAfter?: number): TokenError {
   return retryAfter === undefined ? { code, message } : { code, message, retryAfter };
 }
 

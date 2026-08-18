@@ -24,15 +24,15 @@
 
 ## 4. Núcleo de sessão (`packages/core`)
 
-- [ ] 4.1 Modelar a máquina de estados da sessão: desconectado, conectando, conectado, reconectando, encerrado
-- [ ] 4.2 Implementar entrar e sair de sala sobre o cliente LiveKit, publicando a track de microfone na entrada
-- [ ] 4.3 Implementar o modelo de participantes: presença, estado de mute, indicação de fala
-- [ ] 4.4 Implementar mute e unmute do microfone com propagação do estado à sala
-- [ ] 4.5 Implementar reconexão automática com republicação das tracks ativas e encerramento após falha persistente
-- [ ] 4.6 Implementar publicação de tela com content hint (movimento vs. texto) e simulcast
-- [ ] 4.7 Implementar publicação da track de áudio do sistema separada, sem cancelamento de eco, supressão de ruído ou AGC
-- [ ] 4.8 Implementar assinatura de tracks remotas e controle de volume independente por track e por participante
-- [ ] 4.9 Escrever testes de unidade da máquina de estados e do modelo de participantes com o cliente LiveKit dublado
+- [x] 4.1 Modelar a máquina de estados da sessão: desconectado, conectando, conectado, reconectando, encerrado
+- [x] 4.2 Implementar entrar e sair de sala sobre o cliente LiveKit, publicando a track de microfone na entrada
+- [x] 4.3 Implementar o modelo de participantes: presença, estado de mute, indicação de fala
+- [x] 4.4 Implementar mute e unmute do microfone com propagação do estado à sala
+- [x] 4.5 Implementar reconexão automática com republicação das tracks ativas e encerramento após falha persistente
+- [x] 4.6 Implementar publicação de tela com content hint (movimento vs. texto) e simulcast
+- [x] 4.7 Implementar publicação da track de áudio do sistema separada, sem cancelamento de eco, supressão de ruído ou AGC
+- [x] 4.8 Implementar assinatura de tracks remotas e controle de volume independente por track e por participante
+- [x] 4.9 Escrever testes de unidade da máquina de estados e do modelo de participantes com o cliente LiveKit dublado
 
 ## 5. Fronteira de plataforma (`apps/desktop/main`)
 

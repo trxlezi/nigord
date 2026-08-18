@@ -1,0 +1,263 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { Session } from './session.js';
+import { FakeRoomClient } from './testing.js';
+
+const credentials = { url: 'wss://example', token: 'jwt', identity: 'trxlezi' };
+
+let client: FakeRoomClient;
+let session: Session;
+
+beforeEach(() => {
+  client = new FakeRoomClient();
+  session = new Session({ client });
+});
+
+describe('joining and leaving', () => {
+  it('publishes the microphone on join', async () => {
+    // specs/voice-session: "Entrada bem-sucedida"
+    await session.join(credentials);
+    expect(session.view.connection).toBe('connected');
+    expect(client.calls).toContain('publishMicrophone');
+    expect(client.micEnabled).toBe(true);
+  });
+
+  it('lists the local participant after joining an empty room', async () => {
+    // specs/voice-session: "Sala vazia"
+    await session.join(credentials);
+    expect(session.view.participants).toHaveLength(1);
+    expect(session.view.participants[0]?.isLocal).toBe(true);
+  });
+
+  it('ends the session and surfaces the error when the token is rejected', async () => {
+    // specs/voice-session: "Token inválido ou expirado"
+    client.connectShouldFail = true;
+    const errors: string[] = [];
+    session.on('error', ({ message }) => errors.push(message));
+
+    await expect(session.join(credentials)).rejects.toThrow('token rejected');
+    expect(session.view.connection).toBe('disconnected');
+    expect(session.view.reason).toBe('token_rejected');
+    expect(errors).toHaveLength(1);
+  });
+
+  it('ignores a second join while already connected', async () => {
+    await session.join(credentials);
+    await session.join(credentials);
+    expect(client.calls.filter((c) => c === 'connect')).toHaveLength(1);
+  });
+
+  it('disconnects the transport on leave', async () => {
+    // specs/voice-session: "Saída explícita"
+    await session.join(credentials);
+    await session.leave();
+    expect(client.calls).toContain('disconnect');
+    expect(session.view.connection).toBe('disconnected');
+    expect(session.view.reason).toBe('user_left');
+  });
+});
+
+describe('microphone gating', () => {
+  beforeEach(async () => {
+    await session.join(credentials);
+  });
+
+  it('stops transmitting when muted', async () => {
+    // specs/voice-session: "Silenciar o microfone"
+    await session.toggleMute();
+    expect(client.micEnabled).toBe(false);
+    expect(session.view.micMode).toBe('muted');
+    expect(session.view.transmitting).toBe(false);
+  });
+
+  it('resumes transmitting when unmuted', async () => {
+    await session.toggleMute();
+    await session.toggleMute();
+    expect(client.micEnabled).toBe(true);
+    expect(session.view.micMode).toBe('open');
+  });
+
+  it('stays silent in push-to-talk until the key is held', async () => {
+    // specs/voice-session: "Transmitir enquanto a tecla está pressionada"
+    await session.setMicMode('push-to-talk');
+    expect(client.micEnabled).toBe(false);
+
+    await session.setPushToTalkHeld(true);
+    expect(client.micEnabled).toBe(true);
+    expect(session.view.transmitting).toBe(true);
+
+    await session.setPushToTalkHeld(false);
+    expect(client.micEnabled).toBe(false);
+  });
+
+  it('does not transmit on a held key outside push-to-talk mode', async () => {
+    await session.toggleMute();
+    await session.setPushToTalkHeld(true);
+    expect(client.micEnabled).toBe(false);
+  });
+
+  it('does not strand a held key as an open mic when leaving push-to-talk', async () => {
+    await session.setMicMode('push-to-talk');
+    await session.setPushToTalkHeld(true);
+    await session.setMicMode('muted');
+    expect(client.micEnabled).toBe(false);
+
+    await session.setPushToTalkHeld(false);
+    expect(client.micEnabled).toBe(false);
+  });
+
+  it('republishes without leaving the room when the input device changes', async () => {
+    // specs/desktop-shell: "Trocar de dispositivo durante a sessão"
+    await session.setInputDevice('headset-mic');
+    expect(client.micDeviceId).toBe('headset-mic');
+    expect(client.calls).toContain('unpublishMicrophone');
+    expect(client.calls).not.toContain('disconnect');
+    expect(session.view.connection).toBe('connected');
+  });
+});
+
+describe('reconnection', () => {
+  it('reports reconnecting without ending the session', async () => {
+    // specs/voice-session: "Queda temporária de rede"
+    await session.join(credentials);
+    client.emit('reconnecting', {});
+    expect(session.view.connection).toBe('reconnecting');
+  });
+
+  it('restores the mute state after reconnecting', async () => {
+    // The transport republishes tracks; the gate is the session's job.
+    await session.join(credentials);
+    await session.toggleMute();
+
+    client.emit('reconnecting', {});
+    client.emit('reconnected', {});
+    await Promise.resolve();
+
+    expect(session.view.connection).toBe('connected');
+    expect(client.micEnabled).toBe(false);
+  });
+
+  it('clears the roster when the connection is lost for good', async () => {
+    // specs/voice-session: "Falha persistente"
+    await session.join(credentials);
+    client.join('pedro');
+    expect(session.view.participants).toHaveLength(2);
+
+    client.drop();
+    expect(session.view.connection).toBe('disconnected');
+    expect(session.view.participants).toHaveLength(0);
+  });
+});
+
+describe('presence', () => {
+  beforeEach(async () => {
+    await session.join(credentials);
+  });
+
+  it('adds and removes remote participants', async () => {
+    client.join('pedro');
+    expect(session.view.participants.map((p) => p.identity)).toEqual(['trxlezi', 'pedro']);
+
+    client.emit('participantLeft', { identity: 'pedro' });
+    expect(session.view.participants.map((p) => p.identity)).toEqual(['trxlezi']);
+  });
+
+  it('notifies subscribers when the roster changes', async () => {
+    let notifications = 0;
+    session.on('changed', () => {
+      notifications += 1;
+    });
+    client.join('pedro');
+    expect(notifications).toBeGreaterThan(0);
+  });
+
+  it('does not notify when the speaking set is unchanged', async () => {
+    client.join('pedro');
+    client.emit('speakingChanged', { speaking: ['pedro'] });
+
+    let notifications = 0;
+    session.on('changed', () => {
+      notifications += 1;
+    });
+    client.emit('speakingChanged', { speaking: ['pedro'] });
+    expect(notifications).toBe(0);
+  });
+});
+
+describe('screen sharing', () => {
+  beforeEach(async () => {
+    await session.join(credentials);
+  });
+
+  const publishOptions = {
+    stream: {} as MediaStream,
+    contentKind: 'motion' as const,
+    systemAudioTrack: {} as MediaStreamTrack,
+  };
+
+  it('publishes a screen with its system audio track', async () => {
+    // specs/screen-sharing: "Compartilhar com áudio do sistema"
+    await session.startSharing(publishOptions);
+    expect(session.view.isSharing).toBe(true);
+    expect(client.screen?.systemAudioTrack).not.toBeNull();
+  });
+
+  it('publishes without system audio when it was not granted', async () => {
+    // specs/screen-sharing: "Compartilhar sem áudio do sistema"
+    await session.startSharing({ ...publishOptions, systemAudioTrack: null });
+    expect(client.screen?.systemAudioTrack).toBeNull();
+  });
+
+  it('keeps voice published when sharing stops', async () => {
+    // specs/screen-sharing: "Encerramento explícito"
+    await session.startSharing(publishOptions);
+    await session.stopSharing();
+
+    expect(session.view.isSharing).toBe(false);
+    expect(client.calls).toContain('unpublishScreen');
+    expect(client.calls).not.toContain('unpublishMicrophone');
+    expect(session.view.connection).toBe('connected');
+  });
+
+  it('does not publish a screen while disconnected', async () => {
+    await session.leave();
+    await session.startSharing(publishOptions);
+    expect(client.calls).not.toContain('publishScreen');
+  });
+
+  it('tracks simultaneous remote shares', async () => {
+    // specs/screen-sharing: "Compartilhamentos simultâneos"
+    client.join('pedro');
+    client.join('ana');
+    client.startShare('pedro', 'motion', true);
+    client.startShare('ana', 'detail', false);
+
+    expect(session.view.shares).toHaveLength(2);
+  });
+});
+
+describe('local playback volumes', () => {
+  beforeEach(async () => {
+    await session.join(credentials);
+    client.join('pedro');
+  });
+
+  it('sets system audio volume independently of voice', async () => {
+    // specs/screen-sharing: "Reduzir o áudio do jogo mantendo a voz"
+    session.setSystemAudioVolume('pedro', 0.2);
+    expect(client.systemAudioVolumes.get('pedro')).toBe(0.2);
+    expect(client.voiceVolumes.get('pedro')).toBeUndefined();
+  });
+
+  it('silences one participant locally', async () => {
+    // specs/screen-sharing: "Silenciar um participante localmente"
+    session.setVoiceVolume('pedro', 0);
+    expect(client.voiceVolumes.get('pedro')).toBe(0);
+  });
+
+  it('clamps out-of-range volumes instead of passing them through', async () => {
+    session.setVoiceVolume('pedro', 4);
+    session.setSystemAudioVolume('pedro', -1);
+    expect(client.voiceVolumes.get('pedro')).toBe(1);
+    expect(client.systemAudioVolumes.get('pedro')).toBe(0);
+  });
+});
