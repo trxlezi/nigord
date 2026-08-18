@@ -25,6 +25,7 @@ export class FakeRoomClient implements RoomClient {
   readonly voiceVolumes = new Map<string, number>();
   readonly systemAudioVolumes = new Map<string, number>();
   connectShouldFail = false;
+  readonly screenStreams = new Map<string, MediaStream>();
 
   async connect(options: ConnectOptions): Promise<void> {
     this.calls.push('connect');
@@ -74,6 +75,10 @@ export class FakeRoomClient implements RoomClient {
     this.outputDeviceId = deviceId;
   }
 
+  screenStreamFor(identity: string): MediaStream | null {
+    return this.screenStreams.get(identity) ?? null;
+  }
+
   on<E extends keyof RoomClientEvents>(
     event: E,
     listener: (payload: RoomClientEvents[E]) => void,
@@ -97,5 +102,11 @@ export class FakeRoomClient implements RoomClient {
 
   startShare(identity: string, contentKind: ContentKind, hasSystemAudio: boolean): void {
     this.emit('shareStarted', { identity, contentKind, hasSystemAudio });
+  }
+
+  /** Makes a share playable, as the transport does once subscription lands. */
+  readyShare(identity: string, stream: MediaStream): void {
+    this.screenStreams.set(identity, stream);
+    this.emit('shareStreamReady', { identity });
   }
 }

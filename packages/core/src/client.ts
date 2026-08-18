@@ -34,6 +34,12 @@ export interface RoomClientEvents {
   speakingChanged: { speaking: readonly string[] };
   shareStarted: { identity: string; contentKind: ContentKind; hasSystemAudio: boolean };
   shareStopped: { identity: string };
+  /**
+   * A remote screen track finished subscribing and is now playable. The viewer
+   * needs this as its own signal: a share is announced when published, but the
+   * stream only exists once subscription completes.
+   */
+  shareStreamReady: { identity: string };
 }
 
 export interface RoomClient {
@@ -53,6 +59,13 @@ export interface RoomClient {
   setSystemAudioVolume(identity: string, volume: number): void;
 
   setOutputDevice(deviceId: string): Promise<void>;
+
+  /**
+   * The subscribed screen stream for one participant, or null while it is not
+   * yet available. Returning the stream rather than attaching to an element
+   * keeps DOM ownership in the renderer.
+   */
+  screenStreamFor(identity: string): MediaStream | null;
 
   on<E extends keyof RoomClientEvents>(
     event: E,

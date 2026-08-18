@@ -2,7 +2,7 @@
 
 Voz e compartilhamento de tela para grupos pequenos. Um aplicativo desktop para jogar com amigos — sem comunidades, sem chat, sem descoberta. Só o que importa: falar e mostrar a tela, com o áudio do jogo junto.
 
-> **Status:** em construção. O token server e o núcleo de sessão estão implementados e testados; o invólucro Electron e a interface ainda não. Progresso em [`tasks.md`](openspec/changes/bootstrap-nigord-desktop/tasks.md).
+> **Status:** em construção. O token server, o núcleo de sessão, o invólucro Electron e a interface estão implementados e testados. Falta a captura de áudio do sistema no Windows — que depende de validação em hardware real — e a primeira release. Progresso em [`tasks.md`](openspec/changes/bootstrap-nigord-desktop/tasks.md).
 
 ## Por que existe
 
@@ -89,17 +89,48 @@ openspec show bootstrap-nigord-desktop
 
 ## Instalação
 
-Ainda não há release. Quando houver, o instalador estará em [Releases](../../releases).
+Ainda não há release. Quando houver, o instalador estará em [Releases](../../releases) —
+baixe o `Nigord-Setup-x.y.z.exe` mais recente e execute.
 
-O executável não é assinado — o Windows exibirá o aviso do SmartScreen na primeira execução. É "Mais informações" → "Executar assim mesmo". Certificado de code signing custa centenas de dólares por ano e não se justifica para um grupo de amigos.
+**O Windows vai avisar que não reconhece o programa.** O executável não é
+assinado, então o SmartScreen mostra "O Windows protegeu o seu PC" na primeira
+execução. Para prosseguir: **Mais informações** → **Executar assim mesmo**. Um
+certificado de code signing custa centenas de dólares por ano e não se justifica
+para um grupo de seis amigos, então esse aviso vai continuar aparecendo em cada
+nova versão. Se isso te incomoda, compare o instalador com o publicado na página
+de Releases antes de executar — os builds saem do GitHub Actions a partir do
+código deste repositório, nunca da máquina de alguém.
+
+A instalação é por usuário, não exige administrador, e você escolhe a pasta. As
+atualizações seguintes são automáticas: o aplicativo verifica ao abrir, baixa em
+segundo plano e oferece reiniciar. Se a verificação falhar, ele abre normalmente.
+
+Para entrar em uma sala você precisa do **segredo do grupo** — quem cuida do
+servidor te passa. Sem ele o aplicativo abre, mas nenhuma sala aceita a entrada.
+
+## Reportar problemas
+
+Abra uma issue em [Issues](../../issues). O que ajuda a resolver rápido:
+
+- **O que aconteceu e o que você esperava.** "O áudio do jogo do Pedro não vem"
+  é acionável; "não funciona" não é.
+- **A versão**, que aparece na barra da janela, e a versão do Windows.
+- **Quantas pessoas estavam na sala** e o que cada uma estava fazendo — quase
+  todo problema de mídia depende de quem estava publicando o quê.
+- **Se acontece sempre ou foi uma vez.** Uma falha que não repete costuma ser
+  rede; uma que repete costuma ser nossa.
+
+Se o problema é que o aviso do SmartScreen apareceu, isso é esperado — veja a
+seção acima.
 
 ## Desenvolvimento
 
 ```bash
 pnpm install
-pnpm check        # lint + typecheck + testes
+pnpm check         # lint + typecheck + testes
 pnpm test:watch
-pnpm dev:server   # token server (precisa de .env)
+pnpm dev:server    # token server (precisa de .env — veja .env.example)
+pnpm dev:desktop   # aplicativo Electron, com recarga
 ```
 
 O `packages/core` roda em qualquer sistema — a lógica de sessão é testada sem

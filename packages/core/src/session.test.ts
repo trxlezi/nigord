@@ -233,6 +233,22 @@ describe('screen sharing', () => {
 
     expect(session.view.shares).toHaveLength(2);
   });
+
+  it('exposes a remote screen stream only once it is subscribed', async () => {
+    // specs/screen-sharing: a share is announced when published, but there is
+    // nothing to play until the subscription lands.
+    client.join('pedro');
+    client.startShare('pedro', 'motion', false);
+    expect(session.screenStreamFor('pedro')).toBeNull();
+
+    const before = session.view.streamRevision;
+    const stream = {} as MediaStream;
+    client.readyShare('pedro', stream);
+
+    expect(session.screenStreamFor('pedro')).toBe(stream);
+    // The revision is what tells a renderer to re-read the stream.
+    expect(session.view.streamRevision).toBeGreaterThan(before);
+  });
 });
 
 describe('local playback volumes', () => {

@@ -25,6 +25,12 @@ export interface SessionView {
   /** True while the microphone is actually transmitting. */
   transmitting: boolean;
   isSharing: boolean;
+  /**
+   * Bumped whenever a remote screen stream becomes available. The streams
+   * themselves are not part of the view — they are mutable media objects, not
+   * state — so this is what tells a renderer to re-read them.
+   */
+  streamRevision: number;
 }
 
 export interface SessionEvents {
@@ -57,6 +63,7 @@ export class Session {
   private sharing = false;
   private inputDeviceId: string;
   private localIdentity = '';
+  private streamRevision = 0;
 
   constructor(options: SessionOptions) {
     this.client = options.client;
@@ -172,6 +179,11 @@ export class Session {
     this.client.setSystemAudioVolume(identity, clamp01(volume));
   }
 
+  /** The playable screen stream for a participant, if it has arrived. */
+  screenStreamFor(identity: string): MediaStream | null {
+    return this.client.screenStreamFor(identity);
+  }
+
   // ---- observation ---------------------------------------------------------
 
   on<E extends keyof SessionEvents>(
@@ -190,6 +202,7 @@ export class Session {
       micMode: this.micMode,
       transmitting: this.shouldTransmit(),
       isSharing: this.sharing,
+      streamRevision: this.streamRevision,
     };
   }
 
@@ -268,6 +281,11 @@ export class Session {
         contentKind,
         hasSystemAudio,
       });
+      this.publishView();
+    });
+
+    sub('shareStreamReady', () => {
+      this.streamRevision += 1;
       this.publishView();
     });
 

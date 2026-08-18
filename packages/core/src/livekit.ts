@@ -196,6 +196,19 @@ export class LiveKitRoomClient implements RoomClient {
     await this.room.switchActiveDevice('audiooutput', deviceId);
   }
 
+  screenStreamFor(identity: string): MediaStream | null {
+    const participant = this.room.remoteParticipants.get(identity);
+    if (!participant) return null;
+    for (const publication of participant.trackPublications.values()) {
+      if (publication.source !== Track.Source.ScreenShare) continue;
+      const track = publication.track;
+      // mediaStream is undefined until the subscription completes, which is
+      // exactly the window shareStreamReady closes.
+      return track?.mediaStream ?? null;
+    }
+    return null;
+  }
+
   on<E extends keyof RoomClientEvents>(
     event: E,
     listener: (payload: RoomClientEvents[E]) => void,
@@ -248,6 +261,10 @@ export class LiveKitRoomClient implements RoomClient {
           contentKind,
           hasSystemAudio,
         });
+      })
+      .on(RoomEvent.TrackSubscribed, (_track, publication, participant) => {
+        if (publication.source !== Track.Source.ScreenShare) return;
+        this.emitter.emit('shareStreamReady', { identity: participant.identity });
       })
       .on(RoomEvent.TrackUnpublished, (publication, participant) => {
         if (publication.source !== Track.Source.ScreenShare) return;

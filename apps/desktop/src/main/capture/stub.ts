@@ -18,6 +18,8 @@ const PLATFORM_NOTE =
  * machine cannot drift from the Windows target unnoticed.
  */
 export class StubCaptureProvider implements CaptureProvider {
+  private pending: { sourceId: string; loopbackAudio: boolean } | null = null;
+
   capabilities(): CaptureCapabilities {
     return {
       screenCapture: { available: true, reason: null },
@@ -51,10 +53,15 @@ export class StubCaptureProvider implements CaptureProvider {
     includeSystemAudio: boolean;
   }): Promise<{ sourceId: string; systemAudioGranted: boolean }> {
     // Never true here, whatever was asked for.
+    this.pending = { sourceId: request.sourceId, loopbackAudio: false };
     return { sourceId: request.sourceId, systemAudioGranted: false };
   }
 
+  pendingAuthorisation(): { sourceId: string; loopbackAudio: boolean } | null {
+    return this.pending;
+  }
+
   endCapture(): void {
-    // Nothing to release.
+    this.pending = null;
   }
 }

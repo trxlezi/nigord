@@ -33,6 +33,15 @@ export interface CaptureProvider {
     systemAudioGranted: boolean;
   }>;
 
+  /**
+   * The authorisation the renderer's pending getDisplayMedia call should be
+   * answered with, or null when nothing was authorised.
+   *
+   * `loopbackAudio` is the platform-specific part: only the Windows provider
+   * can ask Electron for system-audio loopback, and only it knows so.
+   */
+  pendingAuthorisation(): { sourceId: string; loopbackAudio: boolean } | null;
+
   /** Clears any pending authorisation. Safe to call when nothing is active. */
   endCapture(): void;
 }

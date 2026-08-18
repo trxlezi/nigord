@@ -55,20 +55,20 @@
 
 ## 7. Interface
 
-- [ ] 7.1 Tela de entrada: escolha de identidade e sala, com estados de erro distinguindo credencial inválida de falha de rede
-- [ ] 7.2 Lista de participantes com indicação de fala, estado de mute e sinalização de quem está compartilhando
-- [ ] 7.3 Controles de sessão: mute, sair, alternar push-to-talk
-- [ ] 7.4 Seletor de fonte de compartilhamento com pré-visualização, opção de áudio do sistema e escolha do tipo de conteúdo
-- [ ] 7.5 Visualizador de transmissão com modo ampliado e reduzido, e escolha entre transmissões simultâneas
-- [ ] 7.6 Painel de volumes: áudio do sistema por transmissão e voz por participante, com silenciamento local
-- [ ] 7.7 Preferências: dispositivos de entrada e saída, tecla de push-to-talk, com reação à troca de dispositivo durante a sessão
-- [ ] 7.8 Indicador de estado da conexão, incluindo reconexão em andamento
+- [x] 7.1 Tela de entrada: escolha de identidade e sala, com estados de erro distinguindo credencial inválida de falha de rede
+- [x] 7.2 Lista de participantes com indicação de fala, estado de mute e sinalização de quem está compartilhando
+- [x] 7.3 Controles de sessão: mute, sair, alternar push-to-talk
+- [x] 7.4 Seletor de fonte de compartilhamento com pré-visualização, opção de áudio do sistema e escolha do tipo de conteúdo
+- [x] 7.5 Visualizador de transmissão com modo ampliado e reduzido, e escolha entre transmissões simultâneas
+- [x] 7.6 Painel de volumes: áudio do sistema por transmissão e voz por participante, com silenciamento local
+- [x] 7.7 Preferências: dispositivos de entrada e saída, tecla de push-to-talk, com reação à troca de dispositivo durante a sessão
+- [x] 7.8 Indicador de estado da conexão, incluindo reconexão em andamento
 
 ## 8. Push-to-talk
 
-- [ ] 8.1 Integrar o `HotkeyProvider` ao controle de microfone do core
-- [ ] 8.2 Implementar a captura de nova tecla na interface, liberando a anterior e persistindo a escolha
-- [ ] 8.3 Tratar o conflito de atalho informando o participante e mantendo a configuração anterior
+- [x] 8.1 Integrar o `HotkeyProvider` ao controle de microfone do core
+- [x] 8.2 Implementar a captura de nova tecla na interface, liberando a anterior e persistindo a escolha
+- [x] 8.3 Tratar o conflito de atalho informando o participante e mantendo a configuração anterior
 
 ## 9. Build, release e distribuição
 
@@ -77,7 +77,7 @@
 - [x] 9.3 Criar o workflow de verificação em pull request: lint, typecheck e testes
 - [x] 9.4 Integrar `electron-updater`: verificar ao iniciar, baixar em segundo plano, oferecer reinício, prosseguir normalmente se a verificação falhar
 - [ ] 9.5 Implantar o token server e apontar o cliente para ele
-- [ ] 9.6 Documentar no README a instalação, o aviso do SmartScreen e como reportar problemas
+- [x] 9.6 Documentar no README a instalação, o aviso do SmartScreen e como reportar problemas
 
 ## 10. Validação com o grupo
 

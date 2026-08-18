@@ -120,15 +120,26 @@ function wireDisplayMedia(): void {
   session.defaultSession.setDisplayMediaRequestHandler(
     (_request, callback) => {
       void (async () => {
-        const sources = await capture.listSources();
-        const first = sources[0];
-        if (!first) {
+        // The renderer chose a source through capture:start before calling
+        // getDisplayMedia. A request without an authorisation is denied rather
+        // than answered with an arbitrary screen.
+        const authorised = capture.pendingAuthorisation();
+        if (!authorised) {
           callback({});
           return;
         }
-        // The renderer has already chosen a source through capture:start; this
-        // fallback only covers a request that arrives without one.
-        callback({ video: { id: first.id, name: first.name } as never });
+
+        const sources = await capture.listSources();
+        const chosen = sources.find((source) => source.id === authorised.sourceId);
+        if (!chosen) {
+          callback({});
+          return;
+        }
+
+        callback({
+          video: { id: chosen.id, name: chosen.name } as never,
+          ...(authorised.loopbackAudio ? { audio: 'loopback' as never } : {}),
+        });
       })();
     },
     { useSystemPicker: false },
