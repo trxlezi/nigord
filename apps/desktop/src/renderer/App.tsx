@@ -240,7 +240,7 @@ export function App(): JSX.Element {
           <ChatPanel
             messages={view.chat}
             localIdentity={localIdentity}
-            onSend={(text) => void session.sendChat(text)}
+            onSend={(text) => session.sendChat(text)}
           />
           <VolumePanel
             participants={view.participants}

@@ -5,7 +5,8 @@ export interface ChatPanelProps {
   messages: readonly ChatMessage[];
   /** This viewer's identity, so their own lines read as theirs. */
   localIdentity: string | null;
-  onSend: (text: string) => void;
+  /** Resolves false when the line could not be sent, so the draft survives. */
+  onSend: (text: string) => Promise<boolean>;
 }
 
 const time = (at: number): string =>
@@ -28,11 +29,13 @@ export function ChatPanel({ messages, localIdentity, onSend }: ChatPanelProps): 
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [messages]);
 
-  const submit = (): void => {
+  const submit = async (): Promise<void> => {
     const text = draft.trim();
     if (text === '') return;
-    onSend(text);
-    setDraft('');
+    // Cleared only once the line is actually away: a session that dropped
+    // between typing and pressing Enter would otherwise swallow the message
+    // and leave nothing to retry with.
+    if (await onSend(text)) setDraft('');
   };
 
   return (
@@ -65,7 +68,7 @@ export function ChatPanel({ messages, localIdentity, onSend }: ChatPanelProps): 
         className="chat__form"
         onSubmit={(event) => {
           event.preventDefault();
-          submit();
+          void submit();
         }}
       >
         <input
