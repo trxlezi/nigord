@@ -93,6 +93,19 @@ copiada também.
 O serviço falha ao iniciar de propósito quando falta qualquer chave, com a
 mensagem dizendo qual — `fly logs` mostra exatamente essa linha.
 
+## Limite de taxa atrás de proxy
+
+O `fly.toml` já define `TRUST_PROXY=1`. Se você servir por um túnel local
+(`cloudflared`), defina o mesmo no `.env`:
+
+```
+TRUST_PROXY=1
+```
+
+Sem isso, as requisições de todos os participantes chegam do mesmo endereço e o
+limite de 20 por minuto passa a valer para o grupo inteiro somado — uma queda de
+rede que faça todo mundo reconectar ao mesmo tempo derrubaria o resto.
+
 ## Alternativa sem deploy
 
 Para um teste rápido, um túnel da máquina de desenvolvimento resolve, sem

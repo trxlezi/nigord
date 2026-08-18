@@ -36,7 +36,11 @@ function isTokenError(value: unknown): value is TokenError {
 }
 
 export async function buildApp(config: Config): Promise<FastifyInstance> {
-  const app = Fastify({ logger: { level: process.env['LOG_LEVEL'] ?? 'info' } });
+  const app = Fastify({
+    logger: { level: process.env['LOG_LEVEL'] ?? 'info' },
+    // Decides which address the rate limiter counts against. See config.ts.
+    trustProxy: config.trustProxy,
+  });
 
   await app.register(rateLimit, {
     max: config.rateLimitMax,

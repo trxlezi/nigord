@@ -16,6 +16,7 @@ const config: Config = {
   tokenTtlSeconds: 600,
   rateLimitMax: 3,
   rateLimitWindow: '1 minute',
+  trustProxy: false,
 };
 
 let app: FastifyInstance;

@@ -14,6 +14,9 @@ primary_region = 'gru'
 [env]
   HOST = '0.0.0.0'
   PORT = '3000'
+  # O Fly roteia por um proxy próprio, então sem isto todo o tráfego chega do
+  # mesmo endereço e o limite de taxa vira um orçamento único do grupo.
+  TRUST_PROXY = '1'
 
 [http_service]
   internal_port = 3000

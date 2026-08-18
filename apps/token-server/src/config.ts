@@ -18,9 +18,35 @@ const configSchema = z.object({
   tokenTtlSeconds: z.coerce.number().int().min(60).max(3600).default(600),
   rateLimitMax: z.coerce.number().int().positive().default(20),
   rateLimitWindow: z.string().default('1 minute'),
+  /**
+   * How many proxy hops sit in front of this service, or a list of proxy
+   * addresses to trust.
+   *
+   * This decides what the rate limiter counts. Behind a tunnel or a platform
+   * router, every request arrives from the same address, so without this the
+   * limit becomes a single shared budget for the whole group — one participant
+   * reconnecting could lock everyone else out.
+   *
+   * It defaults to trusting nothing, because trusting a forwarded header that
+   * nobody set lets any caller claim a fresh address and slip the limit
+   * entirely. Set it to the real number of hops when deploying.
+   */
+  trustProxy: z
+    .union([z.literal(false), z.coerce.number().int().positive(), z.string().min(1)])
+    .default(false),
 });
 
 export type Config = z.infer<typeof configSchema>;
+
+/**
+ * TRUST_PROXY accepts a hop count ("1"), an explicit list of proxy addresses,
+ * or nothing at all. "false"/"0"/empty all mean trust nothing.
+ */
+function parseTrustProxy(raw: string | undefined): false | number | string {
+  if (!raw || raw === 'false' || raw === '0') return false;
+  const hops = Number(raw);
+  return Number.isInteger(hops) && hops > 0 ? hops : raw;
+}
 
 export class ConfigError extends Error {
   constructor(readonly issues: string[]) {
@@ -40,6 +66,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     tokenTtlSeconds: env['TOKEN_TTL_SECONDS'],
     rateLimitMax: env['RATE_LIMIT_MAX'],
     rateLimitWindow: env['RATE_LIMIT_WINDOW'],
+    trustProxy: parseTrustProxy(env['TRUST_PROXY']),
   });
 
   if (!result.success) {
