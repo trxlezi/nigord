@@ -502,6 +502,14 @@ body {
   margin: auto;
 }
 
+/* Sits under the preview rather than over it: an overlay would hide part of
+   the very picture the participant opened this to inspect. */
+.viewer__self {
+  padding: 6px 10px 0;
+  font-size: 12px;
+  text-align: center;
+}
+
 /* ---- overlays: picker and preferences ----------------------------------- */
 
 .overlay {

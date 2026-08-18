@@ -242,6 +242,13 @@ export class LiveKitRoomClient implements RoomClient {
     return null;
   }
 
+  localScreenStream(): MediaStream | null {
+    const track = this.screenTrack?.mediaStreamTrack;
+    // Built fresh rather than cached: the track is replaced on every share, and
+    // a stale stream would show the previous one.
+    return track ? new MediaStream([track]) : null;
+  }
+
   on<E extends keyof RoomClientEvents>(
     event: E,
     listener: (payload: RoomClientEvents[E]) => void,

@@ -209,6 +209,7 @@ export function App(): JSX.Element {
           <ShareViewer
             shares={view.shares}
             watching={watching}
+            localIdentity={view.participants.find((p) => p.isLocal)?.identity ?? null}
             expanded={expanded}
             // streamRevision is in the dependency list of this render, so a
             // stream arriving after the share was announced is picked up.

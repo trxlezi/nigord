@@ -103,6 +103,36 @@ describe('joining and leaving', () => {
   });
 });
 
+describe('watching your own share', () => {
+  it('resolves the local identity to the locally published screen', async () => {
+    // The transport never subscribes anyone to their own tracks, so without
+    // this the sharer waits forever on "Recebendo a transmissão…".
+    await session.join(credentials);
+    const preview = {} as MediaStream;
+    client.localScreen = preview;
+    await session.startSharing({
+      stream: {} as MediaStream,
+      contentKind: 'motion',
+      systemAudioTrack: null,
+    });
+
+    expect(session.screenStreamFor('trxlezi')).toBe(preview);
+  });
+
+  it('still resolves other participants through the transport', async () => {
+    await session.join(credentials);
+    const remote = {} as MediaStream;
+    client.screenStreams.set('amigo', remote);
+
+    expect(session.screenStreamFor('amigo')).toBe(remote);
+  });
+
+  it('has no preview when not sharing', async () => {
+    await session.join(credentials);
+    expect(session.screenStreamFor('trxlezi')).toBeNull();
+  });
+});
+
 describe('microphone gating', () => {
   beforeEach(async () => {
     await session.join(credentials);

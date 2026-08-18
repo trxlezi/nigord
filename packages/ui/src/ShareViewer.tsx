@@ -5,6 +5,8 @@ export interface ShareViewerProps {
   shares: readonly ScreenShare[];
   /** Identity whose share is being watched, or null for none. */
   watching: string | null;
+  /** This viewer's own identity, so their share reads as a preview. */
+  localIdentity: string | null;
   expanded: boolean;
   /** Resolves a share to the stream to play, if it is subscribed yet. */
   streamFor: (identity: string) => MediaStream | null;
@@ -22,6 +24,7 @@ export interface ShareViewerProps {
 export function ShareViewer({
   shares,
   watching,
+  localIdentity,
   expanded,
   streamFor,
   onWatch,
@@ -49,7 +52,7 @@ export function ShareViewer({
               onClick={() => onWatch(watching === share.identity ? null : share.identity)}
               aria-pressed={watching === share.identity}
             >
-              {share.identity}
+              {share.identity === localIdentity ? 'sua tela' : share.identity}
               {share.hasSystemAudio && (
                 <span className="tab__audio" title="Com áudio do sistema">
                   ♪
@@ -68,9 +71,18 @@ export function ShareViewer({
 
       {watching &&
         (stream ? (
-          <video className="viewer__video" ref={videoRef} autoPlay playsInline muted />
+          <>
+            <video className="viewer__video" ref={videoRef} autoPlay playsInline muted />
+            {watching === localIdentity && (
+              <p className="muted viewer__self">
+                Prévia local — é isto que os outros recebem. O som não toca aqui.
+              </p>
+            )}
+          </>
         ) : (
-          <p className="muted viewer__waiting">Recebendo a transmissão…</p>
+          <p className="muted viewer__waiting">
+            {watching === localIdentity ? 'Preparando a prévia…' : 'Recebendo a transmissão…'}
+          </p>
         ))}
     </section>
   );

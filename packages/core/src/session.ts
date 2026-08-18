@@ -240,6 +240,10 @@ export class Session {
 
   /** The playable screen stream for a participant, if it has arrived. */
   screenStreamFor(identity: string): MediaStream | null {
+    // Watching your own share is the only way to confirm what the others are
+    // actually receiving — the sharer has no other feedback that frames are
+    // leaving the machine.
+    if (identity === this.localIdentity) return this.client.localScreenStream();
     return this.client.screenStreamFor(identity);
   }
 

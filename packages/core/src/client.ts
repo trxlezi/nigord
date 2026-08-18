@@ -67,6 +67,15 @@ export interface RoomClient {
    */
   screenStreamFor(identity: string): MediaStream | null;
 
+  /**
+   * The screen this client is publishing, or null when it is not sharing.
+   *
+   * The transport never subscribes anyone to their own tracks, so the sharer is
+   * the one person who cannot see the share through screenStreamFor. It comes
+   * straight off the local track instead.
+   */
+  localScreenStream(): MediaStream | null;
+
   on<E extends keyof RoomClientEvents>(
     event: E,
     listener: (payload: RoomClientEvents[E]) => void,

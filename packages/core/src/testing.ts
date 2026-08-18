@@ -22,6 +22,8 @@ export class FakeRoomClient implements RoomClient {
   micDeviceId: string | null = null;
   outputDeviceId: string | null = null;
   screen: ScreenPublishOptions | null = null;
+  /** Stands in for the local publisher's own video, which has no subscription. */
+  localScreen: MediaStream | null = null;
   readonly voiceVolumes = new Map<string, number>();
   readonly systemAudioVolumes = new Map<string, number>();
   connectShouldFail = false;
@@ -79,6 +81,10 @@ export class FakeRoomClient implements RoomClient {
 
   screenStreamFor(identity: string): MediaStream | null {
     return this.screenStreams.get(identity) ?? null;
+  }
+
+  localScreenStream(): MediaStream | null {
+    return this.screen ? (this.localScreen ?? null) : null;
   }
 
   on<E extends keyof RoomClientEvents>(
