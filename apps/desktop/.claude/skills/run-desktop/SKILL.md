@@ -119,8 +119,28 @@ NIGORD_TOKEN_SERVER=http://127.0.0.1:3000 NIGORD_GROUP_SECRET=segredo-errado \
 | wrong `NIGORD_GROUP_SECRET`         | `A credencial do grupo foi recusada.`   |
 | correct secret, unreachable LiveKit | `A conexão com a sala falhou.`          |
 
-Anything past the entry screen (roster, source picker, viewer, volumes) needs a
-**real LiveKit server**. There is no local substitute; that UI is unverified.
+### Two participants (`two-participants.mjs`)
+
+A call has more than one person in it, and some bugs only exist there. This
+script launches two apps into the same room, shares a screen from one, and
+measures the video on the other:
+
+```bash
+PORT=3300 pnpm --filter @nigord/token-server start   # needs .env at the repo root
+
+NIGORD_TOKEN_SERVER=http://127.0.0.1:3300 NIGORD_GROUP_SECRET=<segredo>   node .claude/skills/run-desktop/two-participants.mjs
+```
+
+It ends with the receiving side's video dimensions — `640x360, tocando: true`
+means the media genuinely arrived. Zeros mean it did not, whatever the interface
+claims.
+
+Two bugs came out of this that a single instance could never show: the roster
+only listing people who joined _after_ you, and the sharer being the one person
+who could not see that they were sharing.
+
+Beyond this, a full session (six people, real networks, NAT traversal) still
+needs real machines.
 
 ## Run (human path)
 
