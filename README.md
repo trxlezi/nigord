@@ -2,7 +2,7 @@
 
 Voz e compartilhamento de tela para grupos pequenos. Um aplicativo desktop para jogar com amigos — sem comunidades, sem chat, sem descoberta. Só o que importa: falar e mostrar a tela, com o áudio do jogo junto.
 
-> **Status:** em construção. O token server, o núcleo de sessão, o invólucro Electron e a interface estão implementados e testados. Falta a captura de áudio do sistema no Windows — que depende de validação em hardware real — e a primeira release. Progresso em [`tasks.md`](openspec/changes/bootstrap-nigord-desktop/tasks.md).
+> **Status:** em construção. O token server, o núcleo de sessão, o invólucro Electron e a interface estão implementados e testados. Falta a captura de áudio do sistema no Windows, que depende de validação em hardware real. Progresso em [`tasks.md`](openspec/changes/bootstrap-nigord-desktop/tasks.md).
 
 ## Por que existe
 
@@ -89,8 +89,8 @@ openspec show bootstrap-nigord-desktop
 
 ## Instalação
 
-Ainda não há release. Quando houver, o instalador estará em [Releases](../../releases) —
-baixe o `Nigord-Setup-x.y.z.exe` mais recente e execute.
+O instalador está em [Releases](../../releases) — baixe o `Nigord-Setup-x.y.z.exe`
+mais recente e execute.
 
 **O Windows vai avisar que não reconhece o programa.** O executável não é
 assinado, então o SmartScreen mostra "O Windows protegeu o seu PC" na primeira
