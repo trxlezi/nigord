@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { CHAT_MAX_LENGTH } from '@nigord/shared';
 import { Session } from './session.js';
 import { FakeRoomClient } from './testing.js';
 
@@ -100,6 +101,75 @@ describe('joining and leaving', () => {
     expect(client.calls).toContain('disconnect');
     expect(session.view.connection).toBe('disconnected');
     expect(session.view.reason).toBe('user_left');
+  });
+});
+
+describe('chat', () => {
+  beforeEach(async () => {
+    await session.join(credentials);
+  });
+
+  it('records your own line, which the transport never echoes back', async () => {
+    await session.sendChat('vamos nessa');
+
+    expect(client.sentChat).toEqual(['vamos nessa']);
+    expect(session.view.chat).toHaveLength(1);
+    expect(session.view.chat[0]?.identity).toBe('trxlezi');
+    expect(session.view.chat[0]?.text).toBe('vamos nessa');
+  });
+
+  it('appends what other people send, oldest first', () => {
+    client.receiveChat('amigo', 'oi');
+    client.receiveChat('outro', 'e aí');
+
+    expect(session.view.chat.map((m) => m.text)).toEqual(['oi', 'e aí']);
+  });
+
+  it('refuses to send an empty line and leaves the draft alone', async () => {
+    expect(await session.sendChat('   ')).toBe(false);
+    expect(client.sentChat).toEqual([]);
+    expect(session.view.chat).toHaveLength(0);
+  });
+
+  it('drops an empty line arriving from a peer', () => {
+    // A peer's own UI cannot be relied on to have refused it.
+    client.receiveChat('amigo', '   ');
+    expect(session.view.chat).toHaveLength(0);
+  });
+
+  it('truncates an oversized line, sent or received', async () => {
+    await session.sendChat('a'.repeat(900));
+    client.receiveChat('amigo', 'b'.repeat(900));
+
+    expect(client.sentChat[0]).toHaveLength(CHAT_MAX_LENGTH);
+    expect(session.view.chat[1]?.text).toHaveLength(CHAT_MAX_LENGTH);
+  });
+
+  it('keeps the tail bounded so an all-evening session cannot grow forever', () => {
+    for (let i = 0; i < 260; i += 1) client.receiveChat('amigo', `linha ${i}`);
+
+    expect(session.view.chat).toHaveLength(200);
+    expect(session.view.chat[199]?.text).toBe('linha 259');
+  });
+
+  it('gives every line a distinct id, even with identical text', () => {
+    client.receiveChat('amigo', 'oi');
+    client.receiveChat('amigo', 'oi');
+
+    const [first, second] = session.view.chat;
+    expect(first?.id).not.toBe(second?.id);
+  });
+
+  it('takes the chat with it on leave, because there is no history', async () => {
+    client.receiveChat('amigo', 'oi');
+    await session.leave();
+    expect(session.view.chat).toHaveLength(0);
+  });
+
+  it('sends nothing when the session is not live', async () => {
+    await session.leave();
+    expect(await session.sendChat('oi')).toBe(false);
+    expect(client.sentChat).toEqual([]);
   });
 });
 

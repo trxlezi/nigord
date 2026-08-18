@@ -41,6 +41,16 @@ import {
 const SYSTEM_AUDIO_TRACK_NAME = 'nigord-system-audio';
 const SCREEN_TRACK_NAME = 'nigord-screen';
 
+/**
+ * Chat travels on the room's data channel as a tagged JSON envelope.
+ *
+ * Tagged because the channel is shared: anything else this app ever sends over
+ * it must be distinguishable, and an untagged payload would have to be guessed
+ * at. Unknown kinds are ignored rather than rejected, so an older client stays
+ * usable when a newer one starts sending something it has never seen.
+ */
+const CHAT_KIND = 'nigord.chat.v1';
+
 export class LiveKitRoomClient implements RoomClient {
   private readonly emitter = new Emitter<RoomClientEvents>();
   private readonly room: Room;
@@ -168,6 +178,13 @@ export class LiveKitRoomClient implements RoomClient {
         red: false,
       });
     }
+  }
+
+  async sendChat(text: string): Promise<void> {
+    const payload = JSON.stringify({ kind: CHAT_KIND, text });
+    await this.room.localParticipant.publishData(new TextEncoder().encode(payload), {
+      reliable: true,
+    });
   }
 
   async unpublishScreen(): Promise<void> {
@@ -309,11 +326,39 @@ export class LiveKitRoomClient implements RoomClient {
       .on(RoomEvent.TrackUnpublished, (publication, participant) => {
         if (publication.source !== Track.Source.ScreenShare) return;
         this.emitter.emit('shareStopped', { identity: participant.identity });
+      })
+      .on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
+        // A packet with no participant came from the server, not a person, and
+        // there is nobody to attribute it to.
+        if (!participant) return;
+        const text = decodeChat(payload);
+        if (text === null) return;
+        this.emitter.emit('chatReceived', { identity: participant.identity, text });
       });
   }
 
   get connectionState(): LKConnectionState {
     return this.room.state;
+  }
+}
+
+/**
+ * Reads a chat line out of a data packet, or null when it is not one.
+ *
+ * Everything here is remote input, so every step is allowed to fail: the
+ * packet may not be UTF-8, may not be JSON, may be JSON of another shape, or
+ * may be another kind entirely. None of those is exceptional enough to
+ * interrupt a session over.
+ */
+function decodeChat(payload: Uint8Array): string | null {
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(payload));
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const envelope = parsed as { kind?: unknown; text?: unknown };
+    if (envelope.kind !== CHAT_KIND) return null;
+    return typeof envelope.text === 'string' ? envelope.text : null;
+  } catch {
+    return null;
   }
 }
 

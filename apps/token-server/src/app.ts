@@ -103,7 +103,10 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
         roomJoin: true,
         canPublish: true,
         canSubscribe: true,
-        canPublishData: false,
+        // Chat rides the room's own data channel, so this is all the server
+        // does for it: no message ever reaches this service, and none is
+        // stored anywhere.
+        canPublishData: true,
       });
 
       const body: TokenResponse = {

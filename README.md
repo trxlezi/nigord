@@ -13,12 +13,17 @@ As alternativas prontas ou degradam a qualidade da tela nos planos gratuitos, ou
 - **Voz sempre ligada** com cancelamento de eco, mute e push-to-talk global — reconhecido mesmo com o jogo em foco
 - **Compartilhamento de tela ou janela** em alta qualidade, com hint de conteúdo para movimento ou texto
 - **Áudio do sistema** capturado como track separada da voz, para que cada espectador controle o volume do jogo do amigo independentemente da voz dele
+- **Chat de texto da sessão** pelo canal de dados da própria sala — sem servidor extra e sem histórico: as mensagens somem quando você sai
 - **Bandeja do sistema** — fechar a janela não derruba a sessão
 - **Atualização automática** via GitHub Releases
 
 ### Fora de escopo
 
-Chat de texto, comunidades, descoberta de usuários, gravação, histórico, webcam, moderação.
+Comunidades, descoberta de usuários, gravação, webcam, moderação — e **histórico**
+de qualquer tipo, inclusive de chat. Guardar mensagens transformaria o token
+server, hoje uma rota sem estado, num serviço com banco de dados, backup e
+migração. É esse peso que o projeto existe para não ter; o chat efêmero entrega
+o uso prático sem nada disso.
 
 ## Arquitetura
 

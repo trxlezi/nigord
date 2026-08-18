@@ -1,3 +1,4 @@
+export * from './ChatPanel.js';
 export * from './ConnectionBadge.js';
 export * from './JoinForm.js';
 export * from './ParticipantList.js';

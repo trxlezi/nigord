@@ -24,6 +24,7 @@ export class FakeRoomClient implements RoomClient {
   screen: ScreenPublishOptions | null = null;
   /** Stands in for the local publisher's own video, which has no subscription. */
   localScreen: MediaStream | null = null;
+  readonly sentChat: string[] = [];
   readonly voiceVolumes = new Map<string, number>();
   readonly systemAudioVolumes = new Map<string, number>();
   connectShouldFail = false;
@@ -81,6 +82,16 @@ export class FakeRoomClient implements RoomClient {
 
   screenStreamFor(identity: string): MediaStream | null {
     return this.screenStreams.get(identity) ?? null;
+  }
+
+  async sendChat(text: string): Promise<void> {
+    this.calls.push('sendChat');
+    this.sentChat.push(text);
+  }
+
+  /** Delivers a line as if it came from someone else in the room. */
+  receiveChat(identity: string, text: string): void {
+    this.emitter.emit('chatReceived', { identity, text });
   }
 
   localScreenStream(): MediaStream | null {

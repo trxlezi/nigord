@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CaptureCapabilities, CaptureSource, ContentKind } from '@nigord/shared';
 import {
+  ChatPanel,
   ConnectionBadge,
   JoinForm,
   ParticipantList,
@@ -40,6 +41,8 @@ export function App(): JSX.Element {
   const [watching, setWatching] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+
+  const localIdentity = view.participants.find((p) => p.isLocal)?.identity ?? null;
 
   const persistKey = useCallback(
     (accelerator: string) => update({ pushToTalkKey: accelerator }),
@@ -209,7 +212,7 @@ export function App(): JSX.Element {
           <ShareViewer
             shares={view.shares}
             watching={watching}
-            localIdentity={view.participants.find((p) => p.isLocal)?.identity ?? null}
+            localIdentity={localIdentity}
             expanded={expanded}
             // streamRevision is in the dependency list of this render, so a
             // stream arriving after the share was announced is picked up.
@@ -233,6 +236,11 @@ export function App(): JSX.Element {
             shares={view.shares}
             locallyMuted={prefs.locallyMuted}
             onToggleLocalMute={toggleLocalMute}
+          />
+          <ChatPanel
+            messages={view.chat}
+            localIdentity={localIdentity}
+            onSend={(text) => void session.sendChat(text)}
           />
           <VolumePanel
             participants={view.participants}

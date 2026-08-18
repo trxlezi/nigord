@@ -405,6 +405,7 @@ body {
 }
 
 .volumes__title,
+.chat__title,
 .prefs__title,
 .picker__title {
   margin: 0;
@@ -412,6 +413,79 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-dim);
+}
+
+/* ---- chat ---------------------------------------------------------------- */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Takes the leftover height of the side panel so the log, not the roster,
+     is what grows — the roster has a known size and the chat does not. */
+  flex: 1;
+  min-height: 160px;
+}
+
+.chat__log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.chat__empty {
+  margin: auto;
+  font-size: 12px;
+  text-align: center;
+}
+
+.chat__line {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.chat__who {
+  color: var(--accent);
+  margin-right: 6px;
+}
+
+.chat__line--own .chat__who {
+  color: var(--text-dim);
+}
+
+.chat__at {
+  color: var(--text-dim);
+  font-size: 11px;
+  margin-right: 6px;
+}
+
+.chat__form {
+  display: flex;
+  gap: 6px;
+}
+
+.chat__input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.chat__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .volumes__row {

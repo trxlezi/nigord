@@ -121,6 +121,18 @@ Desligar o WGC pelas features do Chromium (`AllowWgcScreenCapturer`, `AllowWgcWi
 
 **Em aberto, e é o que decide:** se o loopback de áudio do Electron depende do WGC. O raciocínio diz que não — o loopback é WASAPI, independente do capturador de vídeo — mas isso não foi medido. Se depender, existe um trade-off real entre qualidade de vídeo e som do jogo, e o som do jogo é a razão de ser do projeto.
 
+### D10 — Chat efêmero pelo canal de dados, sem histórico
+
+O chat de texto estava fora de escopo, e a decisão aparecia no código como `canPublishData: false` no grant do token. A exclusão misturava duas coisas de custo muito diferente.
+
+**Mensagens em tempo real são essencialmente gratuitas.** Elas trafegam pelo canal de dados da conexão WebRTC que já existe para a voz: nenhum servidor novo, nenhuma rota nova, nenhuma mensagem passando pelo token server. O volume de texto ao lado de vídeo de tela é irrelevante para a franquia do plano gratuito.
+
+**Histórico é o que custa.** Persistir mensagens exige banco de dados e transforma o token server, hoje uma rota sem estado que assina JWTs, num serviço com estado, backup e migração — exatamente o peso que motivou a exclusão original.
+
+Então o escopo se divide onde o custo se divide: o chat existe enquanto a sala existe e sai com ela. Sem histórico, sem notificações, sem quem-leu-o-quê. A sessão mantém as últimas 200 linhas em memória para que uma noite inteira aberta não cresça sem limite.
+
+O envelope é versionado (`nigord.chat.v1`) e tipos desconhecidos são ignorados em vez de recusados, para que um cliente antigo continue utilizável quando um mais novo passar a enviar algo que ele nunca viu.
+
 ## Risks / Trade-offs
 
 - **A captura de áudio de loopback no Windows via Electron não se comporta como esperado** → Esta é a premissa técnica central de todo o projeto. Validar com um spike isolado na máquina Windows *antes* de qualquer trabalho de interface. Se falhar, a abordagem inteira precisa ser revista, e é melhor saber na primeira semana.

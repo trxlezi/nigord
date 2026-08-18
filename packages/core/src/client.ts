@@ -40,6 +40,8 @@ export interface RoomClientEvents {
    * stream only exists once subscription completes.
    */
   shareStreamReady: { identity: string };
+  /** A chat line arrived from someone else in the room. */
+  chatReceived: { identity: string; text: string };
 }
 
 export interface RoomClient {
@@ -52,6 +54,15 @@ export interface RoomClient {
 
   publishScreen(options: ScreenPublishOptions): Promise<void>;
   unpublishScreen(): Promise<void>;
+
+  /**
+   * Sends a chat line to everyone in the room, reliably.
+   *
+   * Reliable rather than lossy: a dropped syllable of audio is forgivable
+   * because the next one arrives, but a dropped sentence is simply gone and
+   * the sender has no way to know.
+   */
+  sendChat(text: string): Promise<void>;
 
   /** Local playback volume, 0..1, for one remote participant's voice. */
   setVoiceVolume(identity: string, volume: number): void;

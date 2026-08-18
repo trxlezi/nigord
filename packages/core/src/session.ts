@@ -1,10 +1,12 @@
 import type {
+  ChatMessage,
   ConnectionState,
   DisconnectReason,
   MicMode,
   Participant,
   ScreenShare,
 } from '@nigord/shared';
+import { CHAT_MAX_LENGTH } from '@nigord/shared';
 import type { RoomClient, RoomClientEvents, ScreenPublishOptions } from './client.js';
 import { Emitter } from './events.js';
 import { type SessionSnapshot, initialSnapshot, isLive, transition } from './machine.js';
@@ -30,6 +32,8 @@ export interface SessionView {
    */
   hasMicrophone: boolean;
   isSharing: boolean;
+  /** Chat for this session only, oldest first. Never persisted. */
+  chat: readonly ChatMessage[];
   /**
    * Bumped whenever a remote screen stream becomes available. The streams
    * themselves are not part of the view — they are mutable media objects, not
@@ -70,6 +74,8 @@ export class Session {
   private micAvailable = false;
   private localIdentity = '';
   private streamRevision = 0;
+  private chat: ChatMessage[] = [];
+  private chatSequence = 0;
 
   constructor(options: SessionOptions) {
     this.client = options.client;
@@ -124,6 +130,8 @@ export class Session {
     if (this.snapshot.state === 'disconnected') return;
     this.sharing = false;
     this.micAvailable = false;
+    // The chat exists only while the room does, so leaving takes it with it.
+    this.chat = [];
     await this.client.disconnect();
     this.apply({ type: 'DISCONNECT', reason: 'user_left' });
   }
@@ -202,6 +210,42 @@ export class Session {
     return this.client.setOutputDevice(deviceId);
   }
 
+  // ---- chat ----------------------------------------------------------------
+
+  /**
+   * Sends a chat line, and records it locally.
+   *
+   * The transport does not echo a participant's own data back to them, so the
+   * sender would otherwise watch their message vanish. Recording it here is
+   * also what makes it appear instantly instead of after a round trip.
+   *
+   * Returns false when there was nothing to send, so the caller can leave the
+   * input alone rather than clearing what the participant typed.
+   */
+  async sendChat(text: string): Promise<boolean> {
+    const trimmed = text.trim().slice(0, CHAT_MAX_LENGTH);
+    if (trimmed === '' || !isLive(this.snapshot)) return false;
+
+    await this.client.sendChat(trimmed);
+    this.recordChat(this.localIdentity, trimmed);
+    return true;
+  }
+
+  /**
+   * Appends a line, keeping the tail bounded.
+   *
+   * A session left open all evening would otherwise grow without limit, and
+   * nobody scrolls back that far in a chat with no history by design.
+   */
+  private recordChat(identity: string, text: string): void {
+    this.chatSequence += 1;
+    this.chat = [
+      ...this.chat.slice(-(CHAT_HISTORY_LIMIT - 1)),
+      { id: `${this.chatSequence}`, identity, text, at: Date.now() },
+    ];
+    this.publishView();
+  }
+
   // ---- screen share --------------------------------------------------------
 
   async startSharing(options: ScreenPublishOptions): Promise<void> {
@@ -266,6 +310,7 @@ export class Session {
       transmitting: this.shouldTransmit(),
       hasMicrophone: this.micAvailable,
       isSharing: this.sharing,
+      chat: this.chat,
       streamRevision: this.streamRevision,
     };
   }
@@ -301,6 +346,14 @@ export class Session {
       this.room = emptyRoom();
       this.sharing = false;
       this.apply({ type: 'DISCONNECT', reason });
+    });
+
+    sub('chatReceived', ({ identity, text }) => {
+      const trimmed = text.trim().slice(0, CHAT_MAX_LENGTH);
+      // Remote input: a peer could send an empty or oversized line whatever
+      // its own UI allows, so the same limits are applied on arrival.
+      if (trimmed === '') return;
+      this.recordChat(identity, trimmed);
     });
 
     sub('reconnecting', () => this.apply({ type: 'CONNECTION_LOST' }));
@@ -370,6 +423,9 @@ export class Session {
     this.emitter.emit('changed', this.view);
   }
 }
+
+/** How many lines a session keeps in memory. */
+const CHAT_HISTORY_LIMIT = 200;
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 

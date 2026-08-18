@@ -46,6 +46,27 @@ export interface Participant {
   isSharing: boolean;
 }
 
+/**
+ * One chat line, as it exists while the room does.
+ *
+ * Deliberately without persistence: messages ride the same WebRTC data channel
+ * as the media and are never stored anywhere. Keeping history would turn the
+ * token server from a stateless route into a service with a database, backups
+ * and migrations — the weight this project exists to avoid (README, "Fora de
+ * escopo"). What is here is the part that costs nothing.
+ */
+export interface ChatMessage {
+  /** Local id, so a re-render does not need the text to be unique. */
+  id: string;
+  identity: string;
+  text: string;
+  /** Unix milliseconds, from the clock of whoever received it. */
+  at: number;
+}
+
+/** Longest message accepted, in characters. Beyond this the transport pays. */
+export const CHAT_MAX_LENGTH = 500;
+
 export interface ScreenShare {
   /** Identity of the participant sharing. */
   identity: string;
