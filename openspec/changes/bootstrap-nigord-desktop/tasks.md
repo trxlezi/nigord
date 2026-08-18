@@ -76,7 +76,7 @@
 - [x] 9.2 Criar o workflow do GitHub Actions em `windows-latest` que builda e publica em Releases por tag
 - [x] 9.3 Criar o workflow de verificação em pull request: lint, typecheck e testes
 - [x] 9.4 Integrar `electron-updater`: verificar ao iniciar, baixar em segundo plano, oferecer reinício, prosseguir normalmente se a verificação falhar
-- [ ] 9.5 Implantar o token server e apontar o cliente para ele
+- [x] 9.5 Implantar o token server e apontar o cliente para ele
 - [x] 9.6 Documentar no README a instalação, o aviso do SmartScreen e como reportar problemas
 
 ## 10. Validação com o grupo
