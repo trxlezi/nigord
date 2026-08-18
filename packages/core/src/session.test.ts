@@ -166,6 +166,15 @@ describe('chat', () => {
     expect(session.view.chat).toHaveLength(0);
   });
 
+  it('drops the chat when the connection dies, not only on a clean leave', () => {
+    // Otherwise a drop in one room carried its messages into the next one,
+    // attributed to people who were not there.
+    client.receiveChat('amigo', 'segredo');
+    client.emit('disconnected', { reason: 'connection_lost' });
+
+    expect(session.view.chat).toHaveLength(0);
+  });
+
   it('sends nothing when the session is not live', async () => {
     await session.leave();
     expect(await session.sendChat('oi')).toBe(false);

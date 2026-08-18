@@ -130,8 +130,6 @@ export class Session {
     if (this.snapshot.state === 'disconnected') return;
     this.sharing = false;
     this.micAvailable = false;
-    // The chat exists only while the room does, so leaving takes it with it.
-    this.chat = [];
     await this.client.disconnect();
     this.apply({ type: 'DISCONNECT', reason: 'user_left' });
   }
@@ -345,6 +343,10 @@ export class Session {
     sub('disconnected', ({ reason }) => {
       this.room = emptyRoom();
       this.sharing = false;
+      // The chat belongs to the room, so it ends with it — however it ended.
+      // Clearing this only on an explicit leave let a dropped connection carry
+      // one room's messages into the next one.
+      this.chat = [];
       this.apply({ type: 'DISCONNECT', reason });
     });
 
