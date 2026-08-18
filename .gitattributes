@@ -1,0 +1,10 @@
+# O check roda Prettier com endOfLine "lf" (o padrão), e o CI roda em Linux.
+# Sem isto, um clone no Windows com core.autocrlf=true chega com CRLF na árvore
+# de trabalho e `pnpm format:check` reprova todos os arquivos do repositório —
+# uma falha que o CI nunca reproduz.
+* text=auto eol=lf
+
+# Binários: nunca converter.
+*.png binary
+*.ico binary
+*.exe binary
