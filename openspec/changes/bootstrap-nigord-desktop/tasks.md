@@ -7,20 +7,20 @@
 
 ## 2. Fundação do monorepo
 
-- [ ] 2.1 Inicializar pnpm workspaces com `apps/desktop`, `apps/token-server`, `packages/core`, `packages/shared`, `packages/ui`
-- [ ] 2.2 Configurar TypeScript em modo estrito com project references entre os workspaces
-- [ ] 2.3 Configurar ESLint e Prettier, com regra que proíbe importar Electron em `packages/core`, `packages/shared` e `packages/ui`
-- [ ] 2.4 Configurar Vitest em `packages/core` e `apps/token-server`
-- [ ] 2.5 Adicionar `.env.example` e carregamento de configuração validado por schema, sem segredos versionados
+- [x] 2.1 Inicializar pnpm workspaces com `apps/desktop`, `apps/token-server`, `packages/core`, `packages/shared`, `packages/ui`
+- [x] 2.2 Configurar TypeScript em modo estrito com project references entre os workspaces
+- [x] 2.3 Configurar ESLint e Prettier, com regra que proíbe importar Electron em `packages/core`, `packages/shared` e `packages/ui`
+- [x] 2.4 Configurar Vitest em `packages/core` e `apps/token-server`
+- [x] 2.5 Adicionar `.env.example` e carregamento de configuração validado por schema, sem segredos versionados
 
 ## 3. Token server
 
-- [ ] 3.1 Criar o serviço Fastify com validação de configuração no boot que falha se as chaves do LiveKit estiverem ausentes
-- [ ] 3.2 Implementar `POST /token` recebendo sala, identidade e segredo compartilhado, retornando JWT de curta duração e a URL do serviço de mídia
-- [ ] 3.3 Rejeitar solicitações sem o segredo compartilhado ou com campos ausentes/inválidos, com erros distinguíveis
-- [ ] 3.4 Adicionar limite de taxa por origem
-- [ ] 3.5 Escrever testes cobrindo os cenários de `specs/room-access` (solicitação válida, campos ausentes, segredo incorreto, excesso de requisições)
-- [ ] 3.6 Definir os tipos de requisição e resposta em `packages/shared` e consumi-los nas duas pontas
+- [x] 3.1 Criar o serviço Fastify com validação de configuração no boot que falha se as chaves do LiveKit estiverem ausentes
+- [x] 3.2 Implementar `POST /token` recebendo sala, identidade e segredo compartilhado, retornando JWT de curta duração e a URL do serviço de mídia
+- [x] 3.3 Rejeitar solicitações sem o segredo compartilhado ou com campos ausentes/inválidos, com erros distinguíveis
+- [x] 3.4 Adicionar limite de taxa por origem
+- [x] 3.5 Escrever testes cobrindo os cenários de `specs/room-access` (solicitação válida, campos ausentes, segredo incorreto, excesso de requisições)
+- [x] 3.6 Definir os tipos de requisição e resposta em `packages/shared` e consumi-los nas duas pontas
 
 ## 4. Núcleo de sessão (`packages/core`)
 
