@@ -5,7 +5,7 @@ import { bridge } from './bridge.js';
 
 export interface JoinFailure {
   /** Distinguished so the entry screen can say which thing to fix (task 7.1). */
-  kind: 'credential' | 'network';
+  kind: 'credential' | 'network' | 'config';
   message: string;
 }
 
@@ -97,6 +97,10 @@ const MESSAGES: Record<TokenFailureCode, JoinFailure> = {
   unreachable: {
     kind: 'network',
     message: 'Não foi possível alcançar o servidor. Verifique sua conexão e tente de novo.',
+  },
+  unconfigured: {
+    kind: 'config',
+    message: 'Configure o servidor e o segredo do grupo antes de entrar.',
   },
 };
 

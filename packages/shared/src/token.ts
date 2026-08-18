@@ -59,7 +59,7 @@ export const GROUP_SECRET_HEADER = 'x-nigord-secret';
  * How a token request failed, from the client's point of view: the server's own
  * codes plus `unreachable`, which no server can report about itself.
  */
-export type TokenFailureCode = TokenErrorCode | 'unreachable';
+export type TokenFailureCode = TokenErrorCode | 'unreachable' | 'unconfigured';
 
 /**
  * Failures cross the IPC boundary as Error messages — structured errors do not
@@ -84,5 +84,5 @@ export const decodeTokenFailure = (
   const [, code, message = ''] = match;
   const known = tokenErrorCodeSchema.safeParse(code);
   if (known.success) return { code: known.data, message };
-  return code === 'unreachable' ? { code: 'unreachable', message } : null;
+  return code === 'unreachable' || code === 'unconfigured' ? { code, message } : null;
 };

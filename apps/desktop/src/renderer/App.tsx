@@ -7,10 +7,12 @@ import {
   PreferencesPanel,
   SessionControls,
   ShareViewer,
+  ServerSettings,
   SourcePicker,
   VolumePanel,
 } from '@nigord/ui';
 import { bridge } from './bridge.js';
+import { useConfig } from './useConfig.js';
 import { useDevices } from './useDevices.js';
 import { usePreferences } from './usePreferences.js';
 import { usePushToTalk } from './usePushToTalk.js';
@@ -27,6 +29,7 @@ import './styles.css';
  */
 export function App(): JSX.Element {
   const { prefs, loaded, update } = usePreferences();
+  const { config, error: configError, save: saveConfig } = useConfig();
   const { view, joining, failure, session, join, leave } = useSession(prefs.inputDeviceId);
   const devices = useDevices();
 
@@ -166,15 +169,23 @@ export function App(): JSX.Element {
   // the empty room UI mid-attempt and then remount the form on failure —
   // throwing away what the participant had typed.
   if (view.connection === 'disconnected' || joining) {
+    // Without a server and a secret there is nothing to join, so the settings
+    // come first on a fresh install rather than hiding behind a failed attempt.
+    const unconfigured = config !== null && (!config.tokenServerUrl || !config.hasSecret);
+
     return (
       <main className="app app--entry">
-        <JoinForm
-          initialIdentity={prefs.identity}
-          initialRoom={prefs.lastRoom}
-          busy={joining}
-          error={failure?.message ?? null}
-          onSubmit={(values) => void join(values)}
-        />
+        {unconfigured ? (
+          <ServerSettings config={config} error={configError} firstRun onSave={saveConfig} />
+        ) : (
+          <JoinForm
+            initialIdentity={prefs.identity}
+            initialRoom={prefs.lastRoom}
+            busy={joining}
+            error={failure?.message ?? null}
+            onSubmit={(values) => void join(values)}
+          />
+        )}
         {view.reason && view.reason !== 'user_left' && (
           <ConnectionBadge state={view.connection} reason={view.reason} />
         )}
@@ -293,7 +304,9 @@ export function App(): JSX.Element {
             }}
             onPushToTalkKey={(accelerator) => void pushToTalk.rebind(accelerator)}
             onClose={() => setShowPrefs(false)}
-          />
+          >
+            {config && <ServerSettings config={config} error={configError} onSave={saveConfig} />}
+          </PreferencesPanel>
         </div>
       )}
     </main>

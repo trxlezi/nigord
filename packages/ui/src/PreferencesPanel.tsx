@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import type { Capability } from '@nigord/shared';
 
 export interface AudioDevice {
@@ -19,6 +19,8 @@ export interface PreferencesPanelProps {
   onOutputDevice: (deviceId: string) => void;
   onPushToTalkKey: (accelerator: string) => void;
   onClose: () => void;
+  /** Connection settings, passed in so this package stays free of IPC. */
+  children?: ReactNode;
 }
 
 /**
@@ -40,6 +42,7 @@ export function PreferencesPanel({
   onOutputDevice,
   onPushToTalkKey,
   onClose,
+  children,
 }: PreferencesPanelProps): JSX.Element {
   const [capturing, setCapturing] = useState(false);
 
@@ -106,6 +109,8 @@ export function PreferencesPanel({
           </p>
         )}
       </div>
+
+      {children}
 
       <div className="prefs__actions">
         <button className="button" onClick={onClose}>

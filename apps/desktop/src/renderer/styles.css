@@ -231,6 +231,44 @@ body {
   font-size: 13px;
 }
 
+/* ---- server settings ---------------------------------------------------- */
+
+.server {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 380px;
+  padding: 24px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+/* Inside the preferences dialog it is a section, not a card of its own. */
+.prefs .server {
+  width: auto;
+  padding: 14px 0 0;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.server__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+}
+
+.server__title {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
 /* ---- connection badge --------------------------------------------------- */
 
 .badge {

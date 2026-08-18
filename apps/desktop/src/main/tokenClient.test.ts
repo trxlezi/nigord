@@ -7,7 +7,8 @@ import { TokenClient } from './tokenClient.js';
  * its code, which left the UI guessing — and guessing wrong: a server that was
  * simply down was reported to the participant as a rejected credential.
  */
-const client = (): TokenClient => new TokenClient('http://localhost:3000', 'segredo');
+const client = (): TokenClient =>
+  new TokenClient(() => ({ baseUrl: 'http://localhost:3000', groupSecret: 'segredo' }));
 
 const codeOf = async (promise: Promise<unknown>): Promise<string | null> => {
   const error = await promise.then(
@@ -33,6 +34,11 @@ const jsonResponse = (status: number, body: unknown): Response =>
   });
 
 describe('TokenClient failures', () => {
+  it('refuses to request before it is configured', async () => {
+    const unconfigured = new TokenClient(() => ({ baseUrl: '', groupSecret: '' }));
+    expect(await codeOf(unconfigured.request('sala', 'trxlezi'))).toBe('unconfigured');
+  });
+
   it('reports an unreachable server as unreachable, not as a bad credential', async () => {
     stubFetch(() => Promise.reject(new TypeError('fetch failed')));
     expect(await codeOf(client().request('sala', 'trxlezi'))).toBe('unreachable');

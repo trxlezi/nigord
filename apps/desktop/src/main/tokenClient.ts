@@ -13,19 +13,28 @@ import {
  * reachable from the renderer, which runs untrusted-by-design page code.
  */
 export class TokenClient {
-  constructor(
-    private readonly baseUrl: string,
-    private readonly groupSecret: string,
-  ) {}
+  /**
+   * The settings are read at request time, not captured in the constructor: the
+   * participant can change the server or the secret mid-run from the settings
+   * screen, and a client holding a stale copy would keep failing until restart.
+   */
+  constructor(private readonly settings: () => { baseUrl: string; groupSecret: string }) {}
 
   async request(room: string, identity: string): Promise<TokenResponse> {
+    const { baseUrl, groupSecret } = this.settings();
+    if (!baseUrl || !groupSecret) {
+      throw new Error(
+        encodeTokenFailure('unconfigured', 'Servidor ou segredo do grupo ainda não configurados.'),
+      );
+    }
+
     let response: Response;
     try {
-      response = await fetch(new URL('/token', this.baseUrl), {
+      response = await fetch(new URL('/token', baseUrl), {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          [GROUP_SECRET_HEADER]: this.groupSecret,
+          [GROUP_SECRET_HEADER]: groupSecret,
         },
         body: JSON.stringify({ room, identity }),
       });

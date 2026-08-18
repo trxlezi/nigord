@@ -30,7 +30,7 @@ describe('token request contract', () => {
 
 describe('token failure codec', () => {
   it('round-trips every code', () => {
-    for (const code of [...tokenErrorCodeSchema.options, 'unreachable'] as const) {
+    for (const code of [...tokenErrorCodeSchema.options, 'unreachable', 'unconfigured'] as const) {
       const encoded = encodeTokenFailure(code, 'algo aconteceu');
       expect(decodeTokenFailure(encoded)).toEqual({ code, message: 'algo aconteceu' });
     }

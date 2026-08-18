@@ -3,6 +3,7 @@ import { BrowserWindow, Menu, Tray, app, nativeImage, session, shell } from 'ele
 import { createCaptureProvider } from './capture/index.js';
 import { createHotkeyProvider } from './hotkeys/index.js';
 import { registerIpc } from './ipc/register.js';
+import { ConfigStore } from './config/store.js';
 import { PreferencesStore } from './prefs/store.js';
 import { TokenClient } from './tokenClient.js';
 import { initUpdater } from './updater/index.js';
@@ -13,6 +14,7 @@ const hotkeys = createHotkeyProvider();
 let window: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let prefs: PreferencesStore;
+let config: ConfigStore;
 let quitting = false;
 
 /**
@@ -34,6 +36,7 @@ if (!app.requestSingleInstanceLock()) {
 
 async function main(): Promise<void> {
   prefs = new PreferencesStore(app.getPath('userData'));
+  config = new ConfigStore(app.getPath('userData'));
 
   createWindow();
   createTray();
@@ -147,10 +150,10 @@ function wireDisplayMedia(): void {
 }
 
 function wireIpc(): void {
-  const tokenClient = new TokenClient(
-    process.env['NIGORD_TOKEN_SERVER'] ?? 'http://localhost:3000',
-    process.env['NIGORD_GROUP_SECRET'] ?? '',
-  );
+  const tokenClient = new TokenClient(() => ({
+    baseUrl: config.tokenServerUrl,
+    groupSecret: config.groupSecret,
+  }));
 
   registerIpc({
     // Each capability is reported by the provider that implements it. Hotkeys
@@ -182,6 +185,10 @@ function wireIpc(): void {
     },
     'prefs:get': () => prefs.get(),
     'prefs:set': (patch) => prefs.update(patch),
+    // The secret goes in and never comes back out: the response carries only
+    // whether one is stored.
+    'config:get': () => config.view,
+    'config:set': (patch) => config.update(patch),
     'token:request': (payload) => tokenClient.request(payload.room, payload.identity),
     'app:quit': () => {
       quit();
