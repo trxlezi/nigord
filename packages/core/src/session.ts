@@ -176,6 +176,15 @@ export class Session {
     if (!isLive(this.snapshot)) return;
     await this.client.publishScreen(options);
     this.sharing = true;
+    // Marked locally for the same reason as mute: the transport announces a
+    // share to the OTHER participants, so waiting for it would leave the sharer
+    // as the only person in the room who cannot see that they are sharing.
+    this.room = reduceRoom(this.room, {
+      type: 'SHARE_STARTED',
+      identity: this.localIdentity,
+      contentKind: options.contentKind,
+      hasSystemAudio: options.systemAudioTrack !== null,
+    });
     this.publishView();
   }
 
@@ -183,6 +192,7 @@ export class Session {
     if (!this.sharing) return;
     await this.client.unpublishScreen();
     this.sharing = false;
+    this.room = reduceRoom(this.room, { type: 'SHARE_STOPPED', identity: this.localIdentity });
     this.publishView();
   }
 

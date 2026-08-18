@@ -265,6 +265,21 @@ describe('screen sharing', () => {
     expect(session.view.connection).toBe('connected');
   });
 
+  it('marks the sharer in the roster without offering the share back', async () => {
+    // The transport tells the OTHER participants about a share, so the sharer
+    // would otherwise be the only one who cannot see that they are sharing.
+    await session.startSharing(publishOptions);
+
+    const local = session.view.participants.find((participant) => participant.isLocal);
+    expect(local?.isSharing).toBe(true);
+    // Watching your own screen is a mirror, and the stream is not subscribable
+    // locally anyway.
+    expect(session.view.shares).toHaveLength(0);
+
+    await session.stopSharing();
+    expect(session.view.participants.find((p) => p.isLocal)?.isSharing).toBe(false);
+  });
+
   it('does not publish a screen while disconnected', async () => {
     await session.leave();
     await session.startSharing(publishOptions);

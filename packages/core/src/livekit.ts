@@ -65,6 +65,39 @@ export class LiveKitRoomClient implements RoomClient {
 
   async connect({ url, token }: ConnectOptions): Promise<void> {
     await this.room.connect(url, token);
+    this.announceExistingParticipants();
+  }
+
+  /**
+   * ParticipantConnected only fires for people who arrive AFTER us, so anyone
+   * already in the room would never appear — the last person to join would see
+   * an empty room, and everyone before them would be invisible to them.
+   *
+   * Their mute state and any share in progress have to be replayed too: those
+   * events also happened before we were listening.
+   */
+  private announceExistingParticipants(): void {
+    for (const participant of this.room.remoteParticipants.values()) {
+      this.emitter.emit('participantJoined', { identity: participant.identity });
+
+      const publications = [...participant.trackPublications.values()];
+
+      const microphone = publications.find((p) => p.source === Track.Source.Microphone);
+      if (microphone) {
+        this.emitter.emit('muteChanged', {
+          identity: participant.identity,
+          isMuted: microphone.isMuted,
+        });
+      }
+
+      if (publications.some((p) => p.source === Track.Source.ScreenShare)) {
+        this.emitter.emit('shareStarted', {
+          identity: participant.identity,
+          contentKind: this.shareKinds.get(participant.identity) ?? 'motion',
+          hasSystemAudio: publications.some((p) => p.source === Track.Source.ScreenShareAudio),
+        });
+      }
+    }
   }
 
   async disconnect(): Promise<void> {

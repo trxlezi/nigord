@@ -109,4 +109,12 @@ export const listParticipants = (model: RoomModel): Participant[] =>
     return a.identity.localeCompare(b.identity);
   });
 
-export const listShares = (model: RoomModel): ScreenShare[] => [...model.shares.values()];
+/**
+ * Shares available to WATCH — the local participant's own is excluded.
+ *
+ * Someone sharing their screen is already looking at it; offering it back would
+ * be a mirror, and the stream is not even subscribable locally. The roster still
+ * marks them as sharing, which is what the rest of the room sees.
+ */
+export const listShares = (model: RoomModel): ScreenShare[] =>
+  [...model.shares.values()].filter((share) => !model.participants.get(share.identity)?.isLocal);
