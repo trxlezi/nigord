@@ -18,6 +18,27 @@ let config: ConfigStore;
 let quitting = false;
 
 /**
+ * Escape hatch for Chromium's Windows Graphics Capture path.
+ *
+ * WGC logs `ProcessFrame failed, using existing frame: -2147467259` (E_FAIL)
+ * and reuses the previous frame, so a share stays alive while going stale —
+ * viewers see a picture that stutters or stops updating. It is driver- and
+ * display-topology-dependent, which is why this is a switch and not a default:
+ * the older DXGI capturer it falls back to has its own weaknesses, and picking
+ * one blindly for every machine would trade a known problem for an unknown one.
+ *
+ * Set NIGORD_DISABLE_WGC=1 to compare the two on a machine that shows the
+ * failure. Task 1.x has to settle which is right for the group's hardware
+ * before this becomes a default either way.
+ */
+if (process.env['NIGORD_DISABLE_WGC'] === '1') {
+  app.commandLine.appendSwitch(
+    'disable-features',
+    'AllowWgcScreenCapturer,AllowWgcWindowCapturer,AllowWgcDesktopCapturer',
+  );
+}
+
+/**
  * Single instance (task 6.5). A second launch must surface the running session
  * rather than start a rival one that would fight it for the microphone.
  */

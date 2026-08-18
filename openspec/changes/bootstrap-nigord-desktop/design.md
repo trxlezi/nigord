@@ -111,6 +111,16 @@ Amigos (releases)   → NAT real, jogos reais,      Ciclo de dias.
 
 Cada anel é mais lento e mais verdadeiro. O terceiro é o único que revela congestionamento com seis uploads e jogos rodando — e por isso D7 importa.
 
+### D9 — Capturador de tela do Windows: WGC com escape hatch
+
+**Observado em uma máquina** (Windows 11, Intel com duas saídas de vídeo, Electron 33.4.11): compartilhar a tela produz `wgc_capture_session.cc ProcessFrame failed, using existing frame: -2147467259` (`E_FAIL`) de forma contínua, a cada ~200–280 ms. O Windows Graphics Capture não derruba a sessão — reaproveita o último quadro bom — então o compartilhamento sobrevive enquanto envelhece, e quem assiste vê a imagem travar.
+
+Desligar o WGC pelas features do Chromium (`AllowWgcScreenCapturer`, `AllowWgcWindowCapturer`, `AllowWgcDesktopCapturer`) faz o Chromium cair no capturador DXGI antigo e elimina as mensagens por completo.
+
+**Por que é uma variável de ambiente (`NIGORD_DISABLE_WGC=1`) e não o padrão:** o DXGI tem fraquezas próprias, e há evidência de uma máquina só. Trocar o padrão agora seria substituir um problema conhecido por um desconhecido em seis máquinas diferentes. A decisão pede o anel 3.
+
+**Em aberto, e é o que decide:** se o loopback de áudio do Electron depende do WGC. O raciocínio diz que não — o loopback é WASAPI, independente do capturador de vídeo — mas isso não foi medido. Se depender, existe um trade-off real entre qualidade de vídeo e som do jogo, e o som do jogo é a razão de ser do projeto.
+
 ## Risks / Trade-offs
 
 - **A captura de áudio de loopback no Windows via Electron não se comporta como esperado** → Esta é a premissa técnica central de todo o projeto. Validar com um spike isolado na máquina Windows *antes* de qualquer trabalho de interface. Se falhar, a abordagem inteira precisa ser revista, e é melhor saber na primeira semana.
