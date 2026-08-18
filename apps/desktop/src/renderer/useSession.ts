@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { LiveKitRoomClient, Session, type SessionView } from '@nigord/core';
 import { bridge } from './bridge.js';
 
@@ -23,6 +23,11 @@ export interface SessionHandle {
  * The Session is created once and never recreated: it owns the LiveKit room,
  * and rebuilding it on a re-render would drop the connection. React only reads
  * its published view.
+ *
+ * It is deliberately never disposed. The Session lives exactly as long as this
+ * window, so tearing it down on unmount would only matter in StrictMode's
+ * double-mount, where it would leave the second mount holding a dead room. The
+ * main process ends the session when the window really goes away.
  */
 export function useSession(inputDeviceId: string): SessionHandle {
   // Lazy state, not useMemo: this must be created exactly once. useMemo is a
@@ -33,25 +38,8 @@ export function useSession(inputDeviceId: string): SessionHandle {
   const [view, setView] = useState<SessionView>(() => session.view);
   const [joining, setJoining] = useState(false);
   const [failure, setFailure] = useState<JoinFailure | null>(null);
-  const disposed = useRef(false);
 
-  useEffect(() => {
-    const unsubscribe = session.on('changed', setView);
-    return () => {
-      unsubscribe();
-      // StrictMode mounts twice in development; disposing the room on the first
-      // unmount would leave the second mount with a dead session.
-      if (!disposed.current) return;
-      session.dispose();
-    };
-  }, [session]);
-
-  useEffect(
-    () => () => {
-      disposed.current = true;
-    },
-    [],
-  );
+  useEffect(() => session.on('changed', setView), [session]);
 
   const join = useCallback(
     async ({ identity, room }: { identity: string; room: string }) => {

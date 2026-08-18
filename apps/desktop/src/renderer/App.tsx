@@ -51,12 +51,23 @@ export function App(): JSX.Element {
     void bridge.invoke('app:version', {}).then(({ version: value }) => setVersion(value));
   }, []);
 
-  // The stored mode is adopted once, when preferences arrive, so a session
-  // joined in push-to-talk never starts with an open microphone.
+  // Preferences arrive after the Session was created, so the stored choices have
+  // to be adopted once they land. The mode matters most: a session joined in
+  // push-to-talk must never start with an open microphone.
   useEffect(() => {
     if (!loaded) return;
     void session.setMicMode(prefs.micMode);
-  }, [loaded, session, prefs.micMode]);
+    // Before joining this only records the device; the microphone is published
+    // with it on entry, which is what makes the saved choice take effect.
+    void session.setInputDevice(prefs.inputDeviceId);
+  }, [loaded, session, prefs.micMode, prefs.inputDeviceId]);
+
+  // The output device is applied against the live room, so it can only be set
+  // once there is one.
+  useEffect(() => {
+    if (view.connection !== 'connected') return;
+    void session.setOutputDevice(prefs.outputDeviceId);
+  }, [session, view.connection, prefs.outputDeviceId]);
 
   // Volumes are applied to whoever is in the room now: a participant who joins
   // later must still land on the volume this viewer chose for them earlier.
@@ -119,7 +130,7 @@ export function App(): JSX.Element {
           systemAudioTrack: systemAudioTrack ?? null,
         });
 
-        await update({
+        update({
           defaultContentKind: choice.contentKind,
           shareSystemAudioByDefault: choice.includeSystemAudio,
         });
@@ -141,7 +152,7 @@ export function App(): JSX.Element {
   const toggleLocalMute = useCallback(
     (identity: string) => {
       const silenced = prefs.locallyMuted.includes(identity);
-      void update({
+      update({
         locallyMuted: silenced
           ? prefs.locallyMuted.filter((name) => name !== identity)
           : [...prefs.locallyMuted, identity],
@@ -212,10 +223,10 @@ export function App(): JSX.Element {
             voiceVolumes={prefs.voiceVolumes}
             systemAudioVolumes={prefs.systemAudioVolumes}
             onVoiceVolume={(identity, volume) =>
-              void update({ voiceVolumes: { ...prefs.voiceVolumes, [identity]: volume } })
+              update({ voiceVolumes: { ...prefs.voiceVolumes, [identity]: volume } })
             }
             onSystemAudioVolume={(identity, volume) =>
-              void update({
+              update({
                 systemAudioVolumes: { ...prefs.systemAudioVolumes, [identity]: volume },
               })
             }
@@ -231,11 +242,13 @@ export function App(): JSX.Element {
           canShare={capabilities?.screenCapture.available ?? false}
           onToggleMute={() => {
             const next = view.micMode === 'muted' ? 'open' : 'muted';
-            void session.setMicMode(next).then(() => update({ micMode: next }));
+            void session.setMicMode(next);
+            update({ micMode: next });
           }}
           onTogglePushToTalk={() => {
             const next = view.micMode === 'push-to-talk' ? 'open' : 'push-to-talk';
-            void session.setMicMode(next).then(() => update({ micMode: next }));
+            void session.setMicMode(next);
+            update({ micMode: next });
           }}
           onShare={() => void openPicker()}
           onStopSharing={() => void stopSharing()}
@@ -268,11 +281,11 @@ export function App(): JSX.Element {
             hotkeyError={pushToTalk.error}
             onInputDevice={(deviceId) => {
               void session.setInputDevice(deviceId);
-              void update({ inputDeviceId: deviceId });
+              update({ inputDeviceId: deviceId });
             }}
             onOutputDevice={(deviceId) => {
               void session.setOutputDevice(deviceId);
-              void update({ outputDeviceId: deviceId });
+              update({ outputDeviceId: deviceId });
             }}
             onPushToTalkKey={(accelerator) => void pushToTalk.rebind(accelerator)}
             onClose={() => setShowPrefs(false)}

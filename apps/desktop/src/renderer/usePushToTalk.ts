@@ -21,7 +21,7 @@ export function usePushToTalk(
   session: Session,
   micMode: MicMode,
   accelerator: string,
-  onPersist: (accelerator: string) => Promise<void>,
+  onPersist: (accelerator: string) => void,
 ): PushToTalkHandle {
   const [error, setError] = useState<string | null>(null);
   const bound = useRef<string | null>(null);
@@ -76,7 +76,7 @@ export function usePushToTalk(
       }
       bound.current = next;
       setError(null);
-      await onPersist(next);
+      onPersist(next);
     },
     [onPersist],
   );
