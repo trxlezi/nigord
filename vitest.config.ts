@@ -21,6 +21,14 @@ export default defineConfig({
       },
       {
         test: {
+          name: 'desktop',
+          root: './apps/desktop',
+          environment: 'node',
+          include: ['src/**/*.test.ts'],
+        },
+      },
+      {
+        test: {
           name: 'token-server',
           root: './apps/token-server',
           environment: 'node',

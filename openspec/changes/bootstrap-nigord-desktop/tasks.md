@@ -36,22 +36,22 @@
 
 ## 5. Fronteira de plataforma (`apps/desktop/main`)
 
-- [ ] 5.1 Definir a interface `CaptureProvider`: listar fontes, iniciar captura com ou sem áudio do sistema, declarar capacidades disponíveis
-- [ ] 5.2 Definir a interface `HotkeyProvider`: registrar, liberar e reportar conflito
+- [x] 5.1 Definir a interface `CaptureProvider`: listar fontes, iniciar captura com ou sem áudio do sistema, declarar capacidades disponíveis
+- [x] 5.2 Definir a interface `HotkeyProvider`: registrar, liberar e reportar conflito
 - [ ] 5.3 Implementar as versões Windows de ambas, conforme validado no spike
-- [ ] 5.4 Implementar os stubs de desenvolvimento que declaram indisponibilidade explícita, sem simular sucesso
-- [ ] 5.5 Resolver a implementação em um único ponto na inicialização, conforme a plataforma
+- [x] 5.4 Implementar os stubs de desenvolvimento que declaram indisponibilidade explícita, sem simular sucesso
+- [x] 5.5 Resolver a implementação em um único ponto na inicialização, conforme a plataforma
 
 ## 6. Invólucro Electron
 
-- [ ] 6.1 Configurar a janela principal com `contextIsolation`, `sandbox` e sem `nodeIntegration`
-- [ ] 6.2 Implementar o preload expondo uma superfície mínima e nomeada, sem `ipcRenderer` cru
-- [ ] 6.3 Implementar os canais IPC com payloads validados por schema Zod compartilhado nos dois sentidos
-- [ ] 6.4 Implementar bandeja do sistema: fechar a janela oculta e mantém a sessão, restaurar pela bandeja, sair encerra a sessão de forma limpa
-- [ ] 6.5 Implementar instância única, trazendo a instância existente para frente
-- [ ] 6.6 Abrir links externos no navegador padrão em vez de dentro da janela
-- [ ] 6.7 Implementar persistência de preferências com fallback para os padrões quando o arquivo estiver ausente ou corrompido
-- [ ] 6.8 Liberar todos os atalhos globais no encerramento
+- [x] 6.1 Configurar a janela principal com `contextIsolation`, `sandbox` e sem `nodeIntegration`
+- [x] 6.2 Implementar o preload expondo uma superfície mínima e nomeada, sem `ipcRenderer` cru
+- [x] 6.3 Implementar os canais IPC com payloads validados por schema Zod compartilhado nos dois sentidos
+- [x] 6.4 Implementar bandeja do sistema: fechar a janela oculta e mantém a sessão, restaurar pela bandeja, sair encerra a sessão de forma limpa
+- [x] 6.5 Implementar instância única, trazendo a instância existente para frente
+- [x] 6.6 Abrir links externos no navegador padrão em vez de dentro da janela
+- [x] 6.7 Implementar persistência de preferências com fallback para os padrões quando o arquivo estiver ausente ou corrompido
+- [x] 6.8 Liberar todos os atalhos globais no encerramento
 
 ## 7. Interface
 
@@ -72,10 +72,10 @@
 
 ## 9. Build, release e distribuição
 
-- [ ] 9.1 Configurar electron-builder para instalador Windows
-- [ ] 9.2 Criar o workflow do GitHub Actions em `windows-latest` que builda e publica em Releases por tag
-- [ ] 9.3 Criar o workflow de verificação em pull request: lint, typecheck e testes
-- [ ] 9.4 Integrar `electron-updater`: verificar ao iniciar, baixar em segundo plano, oferecer reinício, prosseguir normalmente se a verificação falhar
+- [x] 9.1 Configurar electron-builder para instalador Windows
+- [x] 9.2 Criar o workflow do GitHub Actions em `windows-latest` que builda e publica em Releases por tag
+- [x] 9.3 Criar o workflow de verificação em pull request: lint, typecheck e testes
+- [x] 9.4 Integrar `electron-updater`: verificar ao iniciar, baixar em segundo plano, oferecer reinício, prosseguir normalmente se a verificação falhar
 - [ ] 9.5 Implantar o token server e apontar o cliente para ele
 - [ ] 9.6 Documentar no README a instalação, o aviso do SmartScreen e como reportar problemas
 

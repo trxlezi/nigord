@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { IpcChannelName, IpcEventNameLiteral } from './ipc-names.js';
 import { captureCapabilitiesSchema, captureRequestSchema, captureSourceSchema } from './capture.js';
 import { preferencesSchema } from './preferences.js';
 import { tokenResponseSchema } from './token.js';
@@ -67,6 +68,16 @@ export const ipcContract = {
 
 export type IpcContract = typeof ipcContract;
 export type IpcChannel = keyof IpcContract;
+
+/**
+ * Compile-time proof that ipc-names.ts and this contract describe the same set
+ * of channels. If they diverge, one of these lines stops compiling.
+ */
+type AssertSame<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+const _channelsMatch: AssertSame<IpcChannel, IpcChannelName> = true;
+const _eventsMatch: AssertSame<IpcEventName, IpcEventNameLiteral> = true;
+void _channelsMatch;
+void _eventsMatch;
 
 export type IpcRequest<C extends IpcChannel> = z.infer<IpcContract[C]['request']>;
 export type IpcResponse<C extends IpcChannel> = z.infer<IpcContract[C]['response']>;

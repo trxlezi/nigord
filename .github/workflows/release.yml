@@ -1,0 +1,33 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  windows:
+    # The installer is never built on Linux (design.md D7): cross-compiling
+    # with Wine is fragile around native modules.
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @nigord/desktop package
+        env:
+          # electron-builder publishes to Releases, which is where
+          # electron-updater looks for updates.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

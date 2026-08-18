@@ -1,0 +1,28 @@
+appId: com.nigord.app
+productName: Nigord
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  # Unsigned on purpose: a code signing certificate costs hundreds of dollars a
+  # year and this ships to six friends. The README documents the SmartScreen
+  # warning so nobody mistakes it for malware.
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+
+publish:
+  provider: github
+  owner: trxlezi
+  repo: nigord
