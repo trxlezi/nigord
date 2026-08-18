@@ -25,6 +25,7 @@ export class FakeRoomClient implements RoomClient {
   readonly voiceVolumes = new Map<string, number>();
   readonly systemAudioVolumes = new Map<string, number>();
   connectShouldFail = false;
+  micShouldFail = false;
   readonly screenStreams = new Map<string, MediaStream>();
 
   async connect(options: ConnectOptions): Promise<void> {
@@ -40,6 +41,7 @@ export class FakeRoomClient implements RoomClient {
 
   async publishMicrophone(deviceId: string): Promise<void> {
     this.calls.push('publishMicrophone');
+    if (this.micShouldFail) throw new Error('Requested device not found');
     this.micDeviceId = deviceId;
   }
 

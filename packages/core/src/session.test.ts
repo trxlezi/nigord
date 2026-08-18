@@ -40,6 +40,53 @@ describe('joining and leaving', () => {
     expect(errors).toHaveLength(1);
   });
 
+  it('joins without a microphone so the participant can still listen', async () => {
+    // A machine with no capture device must not be locked out of the room:
+    // hearing the others and watching a share is most of the value.
+    client.micShouldFail = true;
+    const errors: string[] = [];
+    session.on('error', ({ message }) => errors.push(message));
+
+    await session.join(credentials);
+
+    expect(session.view.connection).toBe('connected');
+    expect(session.view.hasMicrophone).toBe(false);
+    expect(session.view.transmitting).toBe(false);
+    // Reported, not hidden — the participant has to know why nobody hears them.
+    expect(errors).toEqual(['Requested device not found']);
+  });
+
+  it('shows a participant with no microphone as muted to the room', async () => {
+    client.micShouldFail = true;
+    await session.join(credentials);
+    expect(session.view.participants[0]?.isMuted).toBe(true);
+  });
+
+  it('never opens the gate without a microphone, whatever the mode', async () => {
+    client.micShouldFail = true;
+    await session.join(credentials);
+
+    await session.setMicMode('open');
+    expect(session.view.transmitting).toBe(false);
+
+    await session.setMicMode('push-to-talk');
+    await session.setPushToTalkHeld(true);
+    expect(session.view.transmitting).toBe(false);
+  });
+
+  it('picks up a microphone plugged in after joining without one', async () => {
+    client.micShouldFail = true;
+    await session.join(credentials);
+    expect(session.view.hasMicrophone).toBe(false);
+
+    // Same device id as before: re-selecting is how recovery is triggered.
+    client.micShouldFail = false;
+    await session.setInputDevice('default');
+
+    expect(session.view.hasMicrophone).toBe(true);
+    expect(session.view.transmitting).toBe(true);
+  });
+
   it('ignores a second join while already connected', async () => {
     await session.join(credentials);
     await session.join(credentials);

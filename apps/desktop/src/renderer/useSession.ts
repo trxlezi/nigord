@@ -109,10 +109,15 @@ function classify(error: unknown): JoinFailure {
   const failure = decodeTokenFailure(text);
   if (failure) return MESSAGES[failure.code];
 
-  // Anything without a code did not come from the token request — most likely
-  // the media server refused the connection after the token was issued.
+  // Anything without a code did not come from the token request: the room
+  // connection or the microphone failed after the token was issued. Those
+  // causes are unrelated and only the underlying message distinguishes them,
+  // so it is carried through instead of being replaced by a generic line that
+  // sent participants looking in the wrong place.
   return {
     kind: 'network',
-    message: 'A conexão com a sala falhou. Verifique sua conexão e tente de novo.',
+    message: text
+      ? `A conexão com a sala falhou: ${text}`
+      : 'A conexão com a sala falhou. Verifique sua conexão e tente de novo.',
   };
 }

@@ -24,6 +24,11 @@ export interface SessionView {
   micMode: MicMode;
   /** True while the microphone is actually transmitting. */
   transmitting: boolean;
+  /**
+   * False when no microphone could be opened. The session is still live: the
+   * participant hears everyone and sees shared screens, they just cannot speak.
+   */
+  hasMicrophone: boolean;
   isSharing: boolean;
   /**
    * Bumped whenever a remote screen stream becomes available. The streams
@@ -62,6 +67,7 @@ export class Session {
   private pushToTalkHeld = false;
   private sharing = false;
   private inputDeviceId: string;
+  private micAvailable = false;
   private localIdentity = '';
   private streamRevision = 0;
 
@@ -81,20 +87,43 @@ export class Session {
 
     try {
       await this.client.connect(options);
-      await this.client.publishMicrophone(this.inputDeviceId);
-      // The gate is applied right after publishing so a session joined while
-      // muted, or in push-to-talk, never leaks a moment of open audio.
-      await this.applyMicGate();
     } catch (error) {
+      // Only the connection is fatal: without it there is no session at all.
       this.apply({ type: 'DISCONNECT', reason: 'token_rejected' });
       this.emitter.emit('error', { message: describeError(error) });
       throw error;
     }
+
+    await this.openMicrophone();
+  }
+
+  /**
+   * Publishes the microphone, tolerating its absence.
+   *
+   * A participant with no working microphone can still hear the others and
+   * watch a shared screen, and that is most of the value of being in the room.
+   * Refusing the join outright would deny them all of it to prevent the one
+   * thing already impossible, so the failure is reported and carried as state.
+   */
+  private async openMicrophone(): Promise<void> {
+    try {
+      await this.client.publishMicrophone(this.inputDeviceId);
+      this.micAvailable = true;
+    } catch (error) {
+      this.micAvailable = false;
+      this.emitter.emit('error', { message: describeError(error) });
+    }
+    // The gate is applied either way so a session joined while muted, or in
+    // push-to-talk, never leaks a moment of open audio — and so someone with
+    // no microphone shows up muted to everyone instead of silently open.
+    await this.applyMicGate();
+    this.publishView();
   }
 
   async leave(): Promise<void> {
     if (this.snapshot.state === 'disconnected') return;
     this.sharing = false;
+    this.micAvailable = false;
     await this.client.disconnect();
     this.apply({ type: 'DISCONNECT', reason: 'user_left' });
   }
@@ -125,6 +154,7 @@ export class Session {
   /** Single source of truth for whether audio flows. */
   private shouldTransmit(): boolean {
     if (!isLive(this.snapshot)) return false;
+    if (!this.micAvailable) return false;
     switch (this.micMode) {
       case 'open':
         return true;
@@ -137,7 +167,7 @@ export class Session {
 
   private async applyMicGate(): Promise<void> {
     const transmitting = this.shouldTransmit();
-    await this.client.setMicrophoneEnabled(transmitting);
+    if (this.micAvailable) await this.client.setMicrophoneEnabled(transmitting);
 
     // Our own mute state is decided here, not learned from the transport. A
     // freshly published track is already unmuted, so unmuting it emits nothing
@@ -156,14 +186,16 @@ export class Session {
     // for a moment and — worse — makes the transport skip the mute events the
     // roster depends on. Callers re-apply stored preferences freely, so the
     // no-op has to be caught here rather than at every call site.
-    if (deviceId === this.inputDeviceId) return;
+    // The exception is a session with no microphone: re-selecting the same
+    // device is how someone who plugged one in gets it picked up, so that must
+    // not be swallowed as a no-op.
+    if (deviceId === this.inputDeviceId && this.micAvailable) return;
     this.inputDeviceId = deviceId;
     // specs/desktop-shell requires switching mid-session without leaving the
     // room, so this republishes rather than reconnecting.
     if (!isLive(this.snapshot)) return;
-    await this.client.unpublishMicrophone();
-    await this.client.publishMicrophone(deviceId);
-    await this.applyMicGate();
+    if (this.micAvailable) await this.client.unpublishMicrophone();
+    await this.openMicrophone();
   }
 
   setOutputDevice(deviceId: string): Promise<void> {
@@ -228,6 +260,7 @@ export class Session {
       shares: listShares(this.room),
       micMode: this.micMode,
       transmitting: this.shouldTransmit(),
+      hasMicrophone: this.micAvailable,
       isSharing: this.sharing,
       streamRevision: this.streamRevision,
     };

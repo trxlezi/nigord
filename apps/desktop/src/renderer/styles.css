@@ -17,6 +17,7 @@
   --accent: #5b8def;
   --live: #3ecf8e;
   --danger: #e5646d;
+  --warn: #e0a94a;
   --radius: 8px;
 }
 
@@ -168,6 +169,11 @@ body {
 
 .mic-state--live {
   color: var(--live);
+}
+
+/* Listen-only: a limitation to state plainly, not an error to alarm about. */
+.mic-state--absent {
+  color: var(--warn);
 }
 
 /* ---- entry form --------------------------------------------------------- */

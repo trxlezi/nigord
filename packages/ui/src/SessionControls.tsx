@@ -3,6 +3,8 @@ import type { MicMode } from '@nigord/shared';
 export interface SessionControlsProps {
   micMode: MicMode;
   transmitting: boolean;
+  /** False when no microphone could be opened; the session runs listen-only. */
+  hasMicrophone: boolean;
   isSharing: boolean;
   canShare: boolean;
   onToggleMute: () => void;
@@ -22,6 +24,7 @@ export interface SessionControlsProps {
 export function SessionControls({
   micMode,
   transmitting,
+  hasMicrophone,
   isSharing,
   canShare,
   onToggleMute,
@@ -36,6 +39,7 @@ export function SessionControls({
         className={`button ${micMode === 'muted' ? 'button--danger' : ''}`}
         onClick={onToggleMute}
         aria-pressed={micMode === 'muted'}
+        disabled={!hasMicrophone}
       >
         {micMode === 'muted' ? 'Ativar microfone' : 'Silenciar'}
       </button>
@@ -44,17 +48,26 @@ export function SessionControls({
         className={`button ${micMode === 'push-to-talk' ? 'button--active' : ''}`}
         onClick={onTogglePushToTalk}
         aria-pressed={micMode === 'push-to-talk'}
+        disabled={!hasMicrophone}
       >
         Push-to-talk
       </button>
 
-      <span
-        className={`mic-state ${transmitting ? 'mic-state--live' : ''}`}
-        role="status"
-        aria-live="off"
-      >
-        {transmitting ? 'transmitindo' : 'em silêncio'}
-      </span>
+      {/* Without this the participant sees "em silêncio" and reasonably reads
+          it as their own mute, then waits for an answer that cannot come. */}
+      {hasMicrophone ? (
+        <span
+          className={`mic-state ${transmitting ? 'mic-state--live' : ''}`}
+          role="status"
+          aria-live="off"
+        >
+          {transmitting ? 'transmitindo' : 'em silêncio'}
+        </span>
+      ) : (
+        <span className="mic-state mic-state--absent" role="status" aria-live="polite">
+          sem microfone — você ouve, mas ninguém te ouve
+        </span>
+      )}
 
       <span className="controls__spacer" />
 

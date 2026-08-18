@@ -253,6 +253,7 @@ export function App(): JSX.Element {
         <SessionControls
           micMode={view.micMode}
           transmitting={view.transmitting}
+          hasMicrophone={view.hasMicrophone}
           isSharing={view.isSharing}
           canShare={capabilities?.screenCapture.available ?? false}
           onToggleMute={() => {
