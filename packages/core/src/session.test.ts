@@ -115,6 +115,53 @@ describe('microphone gating', () => {
   });
 });
 
+describe('local mute state', () => {
+  beforeEach(async () => {
+    await session.join(credentials);
+  });
+
+  const local = (): { isMuted: boolean } | undefined =>
+    session.view.participants.find((participant) => participant.isLocal);
+
+  it('reflects mute and unmute without waiting for the transport to echo', async () => {
+    // The transport emits nothing when a freshly published track is unmuted,
+    // which used to leave the roster showing a muted participant who was in
+    // fact speaking.
+    await session.setMicMode('muted');
+    expect(local()?.isMuted).toBe(true);
+
+    await session.setMicMode('open');
+    expect(local()?.isMuted).toBe(false);
+  });
+
+  it('shows push-to-talk as muted until the key is held', async () => {
+    await session.setMicMode('push-to-talk');
+    expect(local()?.isMuted).toBe(true);
+
+    await session.setPushToTalkHeld(true);
+    expect(local()?.isMuted).toBe(false);
+
+    await session.setPushToTalkHeld(false);
+    expect(local()?.isMuted).toBe(true);
+  });
+
+  it('does not republish the microphone when the device has not changed', async () => {
+    // Re-applying stored preferences must be free: republishing drops audio
+    // and makes the transport skip mute events.
+    const before = client.calls.filter((call) => call === 'publishMicrophone').length;
+    await session.setInputDevice(client.micDeviceId ?? 'default');
+    const after = client.calls.filter((call) => call === 'publishMicrophone').length;
+
+    expect(after).toBe(before);
+  });
+
+  it('republishes when the device really changes', async () => {
+    await session.setInputDevice('outro-microfone');
+    expect(client.calls).toContain('unpublishMicrophone');
+    expect(client.micDeviceId).toBe('outro-microfone');
+  });
+});
+
 describe('reconnection', () => {
   it('reports reconnecting without ending the session', async () => {
     // specs/voice-session: "Queda temporária de rede"

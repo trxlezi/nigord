@@ -94,6 +94,12 @@ function launchApp() {
       APP_DIR,
       '--no-sandbox',
       `--remote-debugging-port=${PORT}`,
+      // Xvfb has no audio or video devices at all. Without a fake one, getUserMedia
+      // fails and anything that depends on a live microphone cannot be exercised.
+      ...(process.env['FAKE_MEDIA']
+        ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']
+        : []),
+      ...(process.env['ELECTRON_EXTRA_ARGS'] ?? '').split(' ').filter(Boolean),
     ],
     { cwd: REPO_ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'] },
   );

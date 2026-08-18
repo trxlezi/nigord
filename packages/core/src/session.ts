@@ -136,10 +136,27 @@ export class Session {
   }
 
   private async applyMicGate(): Promise<void> {
-    await this.client.setMicrophoneEnabled(this.shouldTransmit());
+    const transmitting = this.shouldTransmit();
+    await this.client.setMicrophoneEnabled(transmitting);
+
+    // Our own mute state is decided here, not learned from the transport. A
+    // freshly published track is already unmuted, so unmuting it emits nothing
+    // and the roster would keep showing "mudo" for someone who is speaking.
+    if (this.localIdentity) {
+      this.room = reduceRoom(this.room, {
+        type: 'MUTE_CHANGED',
+        identity: this.localIdentity,
+        isMuted: !transmitting,
+      });
+    }
   }
 
   async setInputDevice(deviceId: string): Promise<void> {
+    // Republishing tears the track down and builds a new one, which drops audio
+    // for a moment and — worse — makes the transport skip the mute events the
+    // roster depends on. Callers re-apply stored preferences freely, so the
+    // no-op has to be caught here rather than at every call site.
+    if (deviceId === this.inputDeviceId) return;
     this.inputDeviceId = deviceId;
     // specs/desktop-shell requires switching mid-session without leaving the
     // room, so this republishes rather than reconnecting.
