@@ -126,6 +126,50 @@ describe('POST /token', () => {
   });
 });
 
+describe('rate limiting behind a proxy', () => {
+  const body = { room: 'sala-principal', identity: 'trxlezi' };
+
+  const postFrom = (instance: FastifyInstance, forwardedFor: string) =>
+    instance.inject({
+      method: 'POST',
+      url: '/token',
+      headers: {
+        [GROUP_SECRET_HEADER]: config.groupSecret,
+        'x-forwarded-for': forwardedFor,
+      },
+      payload: body,
+    });
+
+  const exhaust = async (instance: FastifyInstance, forwardedFor: string): Promise<void> => {
+    for (let i = 0; i < config.rateLimitMax; i += 1) {
+      await postFrom(instance, forwardedFor);
+    }
+  };
+
+  it('gives each participant their own budget when the proxy is trusted', async () => {
+    // A tunnel or platform router makes every request arrive from one address.
+    // Counting that address would turn the limit into a single budget shared by
+    // the whole group, where one person reconnecting locks out everyone else.
+    const proxied = await buildApp({ ...config, trustProxy: 1 });
+    try {
+      await exhaust(proxied, '1.1.1.1');
+      expect((await postFrom(proxied, '1.1.1.1')).statusCode).toBe(429);
+
+      // Someone who has not spent their own budget still gets through.
+      expect((await postFrom(proxied, '2.2.2.2')).statusCode).toBe(200);
+    } finally {
+      await proxied.close();
+    }
+  });
+
+  it('ignores the forwarded address when no proxy is trusted', async () => {
+    // The default has to stay closed: trusting a header nobody set would let a
+    // caller claim a fresh address per attempt and slip the limit entirely.
+    await exhaust(app, '1.1.1.1');
+    expect((await postFrom(app, '2.2.2.2')).statusCode).toBe(429);
+  });
+});
+
 describe('GET /health', () => {
   it('answers without a secret', async () => {
     const res = await app.inject({ method: 'GET', url: '/health' });
