@@ -54,3 +54,35 @@ export type TokenError = z.infer<typeof tokenErrorSchema>;
 
 /** Header carrying the group shared secret. */
 export const GROUP_SECRET_HEADER = 'x-nigord-secret';
+
+/**
+ * How a token request failed, from the client's point of view: the server's own
+ * codes plus `unreachable`, which no server can report about itself.
+ */
+export type TokenFailureCode = TokenErrorCode | 'unreachable';
+
+/**
+ * Failures cross the IPC boundary as Error messages — structured errors do not
+ * survive the serialisation — so the code travels as a machine-readable prefix.
+ *
+ * This exists because classifying failures by matching their prose is fragile:
+ * the channel name `token:request` appears in Electron's own IPC error text,
+ * which made an unreachable server look like a rejected credential.
+ */
+const TOKEN_FAILURE_PREFIX = 'nigord-token-failure';
+
+export const encodeTokenFailure = (code: TokenFailureCode, message: string): string =>
+  `${TOKEN_FAILURE_PREFIX}/${code} ${message}`;
+
+/** Recovers the code from an error message, wherever the prefix appears in it. */
+export const decodeTokenFailure = (
+  text: string,
+): { code: TokenFailureCode; message: string } | null => {
+  const match = new RegExp(`${TOKEN_FAILURE_PREFIX}/([a-z_]+) ?([\\s\\S]*)`).exec(text);
+  if (!match) return null;
+
+  const [, code, message = ''] = match;
+  const known = tokenErrorCodeSchema.safeParse(code);
+  if (known.success) return { code: known.data, message };
+  return code === 'unreachable' ? { code: 'unreachable', message } : null;
+};

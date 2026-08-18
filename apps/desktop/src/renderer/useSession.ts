@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { LiveKitRoomClient, Session, type SessionView } from '@nigord/core';
+import { type TokenFailureCode, decodeTokenFailure } from '@nigord/shared';
 import { bridge } from './bridge.js';
 
 export interface JoinFailure {
@@ -70,18 +71,44 @@ export function useSession(inputDeviceId: string): SessionHandle {
  * A rejected credential and an unreachable server need different actions from
  * the participant, so they are never collapsed into one message
  * (specs/voice-session, "Falha ao entrar na sala").
+ *
+ * The decision is made on the code the main process encoded, never on the prose:
+ * Electron wraps IPC failures in text containing the channel name, and
+ * `token:request` matching a keyword made every network outage read as a bad
+ * secret.
  */
-function classify(error: unknown): JoinFailure {
-  const message = error instanceof Error ? error.message : String(error);
-
-  if (/401|403|secret|token|credential|unauthor/i.test(message)) {
-    return {
-      kind: 'credential',
-      message: 'A credencial do grupo foi recusada. Confira o segredo configurado.',
-    };
-  }
-  return {
+const MESSAGES: Record<TokenFailureCode, JoinFailure> = {
+  unauthorized: {
+    kind: 'credential',
+    message: 'A credencial do grupo foi recusada. Confira o segredo configurado.',
+  },
+  invalid_request: {
+    kind: 'credential',
+    message: 'O nome ou a sala não são aceitos. Use letras minúsculas, números e traços.',
+  },
+  rate_limited: {
+    kind: 'network',
+    message: 'Muitas tentativas em pouco tempo. Espere alguns instantes e tente de novo.',
+  },
+  server_error: {
+    kind: 'network',
+    message: 'O servidor de credenciais respondeu com erro. Tente de novo em instantes.',
+  },
+  unreachable: {
     kind: 'network',
     message: 'Não foi possível alcançar o servidor. Verifique sua conexão e tente de novo.',
+  },
+};
+
+function classify(error: unknown): JoinFailure {
+  const text = error instanceof Error ? error.message : String(error);
+  const failure = decodeTokenFailure(text);
+  if (failure) return MESSAGES[failure.code];
+
+  // Anything without a code did not come from the token request — most likely
+  // the media server refused the connection after the token was issued.
+  return {
+    kind: 'network',
+    message: 'A conexão com a sala falhou. Verifique sua conexão e tente de novo.',
   };
 }

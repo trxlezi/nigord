@@ -161,7 +161,11 @@ export function App(): JSX.Element {
     [prefs.locallyMuted, update],
   );
 
-  if (view.connection === 'disconnected' && !joining) {
+  // The form stays mounted for the whole attempt. While connecting the state is
+  // already 'connecting', so keying this on the connection alone would swap in
+  // the empty room UI mid-attempt and then remount the form on failure —
+  // throwing away what the participant had typed.
+  if (view.connection === 'disconnected' || joining) {
     return (
       <main className="app app--entry">
         <JoinForm
