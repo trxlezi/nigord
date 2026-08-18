@@ -153,7 +153,14 @@ function wireIpc(): void {
   );
 
   registerIpc({
-    'capture:capabilities': () => capture.capabilities(),
+    // Each capability is reported by the provider that implements it. Hotkeys
+    // belong to the HotkeyProvider, not to capture — reading them off the
+    // capture stub disabled the key picker on Windows, where the real hotkey
+    // provider works fine.
+    'capture:capabilities': () => ({
+      ...capture.capabilities(),
+      globalHotkeys: hotkeys.available(),
+    }),
     'capture:sources': async () => ({ sources: await capture.listSources() }),
     'capture:start': (payload) =>
       capture.beginCapture({

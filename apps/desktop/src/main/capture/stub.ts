@@ -3,8 +3,8 @@ import type { CaptureCapabilities, CaptureSource } from '@nigord/shared';
 import type { CaptureProvider } from './types.js';
 
 const PLATFORM_NOTE =
-  'System audio capture is only implemented for Windows. This is a development ' +
-  'build running on another platform.';
+  'A captura de áudio do sistema ainda não está implementada nesta versão. ' +
+  'Compartilhar a tela funciona; o som do jogo não vai junto.';
 
 /**
  * Development stub for non-Windows platforms (task 5.4).
@@ -24,12 +24,9 @@ export class StubCaptureProvider implements CaptureProvider {
     return {
       screenCapture: { available: true, reason: null },
       systemAudio: { available: false, reason: PLATFORM_NOTE },
-      globalHotkeys: {
-        available: false,
-        reason:
-          'Global hotkeys are registered on this platform but cannot be verified ' +
-          'against fullscreen games outside Windows.',
-      },
+      // Reported by the HotkeyProvider, which is the half that implements it.
+      // Kept here only to satisfy the shared schema; main overrides it.
+      globalHotkeys: { available: false, reason: null },
     };
   }
 
