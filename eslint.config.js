@@ -10,7 +10,17 @@ import tseslint from 'typescript-eslint';
  */
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/dist-types/**', '**/out/**', '**/release/**', '**/node_modules/**'],
+    // .claude/skills holds agent tooling — driver scripts that run under plain
+    // Node, outside the TypeScript project. Linting them with the app's config
+    // only reports missing browser/Node globals it was never told about.
+    ignores: [
+      '**/dist/**',
+      '**/dist-types/**',
+      '**/out/**',
+      '**/release/**',
+      '**/node_modules/**',
+      '**/.claude/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

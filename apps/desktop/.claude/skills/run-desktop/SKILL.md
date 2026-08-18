@@ -1,0 +1,173 @@
+---
+name: run-desktop
+description: Build, run, screenshot and drive the Nigord Electron desktop app on Linux. Use when asked to start the desktop app, take a screenshot of the UI, click through it, exercise its IPC/bridge surface, or confirm a change works in the real app rather than only in tests.
+---
+
+Nigord is an Electron app (main + preload + React renderer). Drive it with the
+CDP driver at `.claude/skills/run-desktop/driver.mjs`: it launches the app under
+`xvfb-run`, speaks the Chrome DevTools Protocol over Node's built-in `fetch` and
+`WebSocket`, and needs no extra dependencies — `playwright-core` is not installed
+here and neither is `tmux`.
+
+**All paths below are relative to `apps/desktop/`.**
+
+The driver is **batch**: each run launches the app, executes your commands, and
+kills it. This is deliberate — the DevTools endpoint accepts only one debugger
+connection per page, so a long-lived driver (or a stray background client) locks
+out every later run.
+
+## Prerequisites
+
+`xvfb-run` is required and already present at `/usr/bin/xvfb-run`. Nothing else
+had to be installed on this machine.
+
+The Electron binary is the one real trap. `pnpm dev:desktop` fails with
+`Error: Electron uninstall` because pnpm skipped Electron's install script, and
+**`pnpm rebuild electron` does not fix it**. Fetch the binary directly (~100MB):
+
+```bash
+(cd ../../node_modules/.pnpm/electron@33.4.11/node_modules/electron && node install.js)
+```
+
+`33.4.11` is the _resolved_ version, not the `^33.3.0` range in `package.json`,
+so it changes on upgrade — the driver discovers the real directory and prints the
+exact command when the binary is missing. Take it from there rather than
+guessing.
+
+## Build
+
+The driver runs the built output, not the dev server:
+
+```bash
+pnpm -C apps/desktop build
+```
+
+Rebuild after every source change — the driver will happily run a stale bundle.
+
+## Run (agent path)
+
+Commands come from argv, or from stdin one per line (`#` comments allowed):
+
+```bash
+cd apps/desktop
+node .claude/skills/run-desktop/driver.mjs 'ss entrada' 'text'
+```
+
+```bash
+node .claude/skills/run-desktop/driver.mjs <<'EOF'
+invoke capture:capabilities
+fill .join input | trxlezi
+submit form
+wait-text .alert
+ss erro-de-rede
+EOF
+```
+
+Screenshots land in `/tmp/nigord-shots/` (override with `SCREENSHOT_DIR`).
+**Open the PNG and look at it** — a blank frame means the launch failed.
+
+Exit code is 1 if any command reported `NOT_FOUND`, `TIMEOUT` or `ERROR`, so it
+is safe to chain in a check.
+
+### Commands
+
+| command                   | what it does                                                         |
+| ------------------------- | -------------------------------------------------------------------- |
+| `ss [name]`               | screenshot → `/tmp/nigord-shots/<name>.png`                          |
+| `text [css]`              | print `innerText` of a selector, or of the whole body                |
+| `eval <js>`               | evaluate in the renderer, print the JSON result                      |
+| `invoke <channel> [json]` | call the preload bridge, e.g. `invoke prefs:set {"micMode":"muted"}` |
+| `click <css>`             | DOM click (not coordinates — cannot miss)                            |
+| `click-text <text>`       | click the button/link/label with this text                           |
+| `fill <css> \| <value>`   | set a React-controlled input (**the pipe is required**)              |
+| `submit [css]`            | `requestSubmit()` on a form, so React's `onSubmit` runs              |
+| `wait <css>`              | wait up to 15s for an element                                        |
+| `wait-text <css>`         | wait up to 15s for an element to have text                           |
+| `press <key>`             | dispatch a key event                                                 |
+| `sleep <ms>`              | pause                                                                |
+| `help`                    | list commands                                                        |
+
+`invoke` is the highest-value command here: the bridge is the app's entire
+platform surface, so capture, hotkeys and preferences can all be exercised
+without ever joining a room.
+
+### Reaching the failure paths
+
+The entry screen distinguishes three failures, and all three are reachable
+locally. With no token server running you get the network one. For the other
+two, start a token server with throwaway credentials (no real keys needed — the
+LiveKit URL never has to resolve):
+
+```bash
+LIVEKIT_URL="wss://exemplo-local.invalid" \
+LIVEKIT_API_KEY="chave-de-teste-local" \
+LIVEKIT_API_SECRET="segredo-de-teste-local-suficientemente-longo" \
+NIGORD_GROUP_SECRET="segredo-do-grupo-teste" \
+pnpm -s dev:server &
+```
+
+Then point the app at it, with the right or the wrong secret:
+
+```bash
+NIGORD_TOKEN_SERVER=http://127.0.0.1:3000 NIGORD_GROUP_SECRET=segredo-errado \
+  node .claude/skills/run-desktop/driver.mjs 'fill .join input | trxlezi' 'submit form' 'wait-text .alert'
+```
+
+| setup                               | expected alert                          |
+| ----------------------------------- | --------------------------------------- |
+| no token server                     | `Não foi possível alcançar o servidor.` |
+| wrong `NIGORD_GROUP_SECRET`         | `A credencial do grupo foi recusada.`   |
+| correct secret, unreachable LiveKit | `A conexão com a sala falhou.`          |
+
+Anything past the entry screen (roster, source picker, viewer, volumes) needs a
+**real LiveKit server**. There is no local substitute; that UI is unverified.
+
+## Run (human path)
+
+`pnpm dev:desktop` opens a real window with hot reload. It needs the Electron
+binary from Prerequisites, and it is useless headless.
+
+## Test
+
+```bash
+pnpm -w test          # 87 tests, all packages
+pnpm -w check         # lint + typecheck + tests
+```
+
+## Gotchas
+
+- **`pnpm rebuild electron` is a no-op here.** It prints nothing and fixes
+  nothing. Only `node install.js` inside the electron package works.
+- **Node resolves `localhost` to `::1`; the DevTools endpoint is IPv4-only.**
+  Using `localhost` makes `fetch` hang until timeout with no error. The driver
+  always uses `127.0.0.1`.
+- **One debugger connection per page.** A driver process left alive in the
+  background holds it, and every later run then hangs at connect. If that
+  happens, kill the stray Node process.
+- **Killing `xvfb-run` does not kill Electron.** The survivor then makes the
+  next launch exit _instantly_ through the single-instance lock (task 6.5),
+  which looks like a launch failure but is the app working correctly. The driver
+  spawns detached and kills the whole process group.
+- **`pkill -f <pattern>` kills the agent's own shell**, because the pattern
+  appears in the shell's command line. Filter `ps -eo pid,args` instead.
+- **The page target exists before React mounts.** Commands issued too early get
+  `NOT_FOUND` for elements that appear moments later. The driver waits for
+  `#root` to have a child.
+- **`.value = x` does not work on the inputs.** React tracks its own value on
+  the node; `fill` goes through the native setter plus an `input` event.
+- **Only one capture source appears under Xvfb** — the app's own window, with an
+  empty name. Not a bug in the picker; there is nothing else on that display.
+- **PipeWire and GPU noise on stderr is normal** (`viz_main_impl`,
+  `pw_thread_loop_wait`). The driver filters it and prints only real errors.
+
+## Troubleshooting
+
+- **`Electron binary missing`** → run the `node install.js` line from
+  Prerequisites.
+- **`Build output missing`** → `pnpm -C apps/desktop build`.
+- **`App never exposed a page target`** → almost always a leftover Electron
+  process holding the single-instance lock. Find and kill it via
+  `ps -eo pid,args`.
+- **Driver hangs before `launched:`** → a stray driver process holds the
+  debugger connection.
+- **Commands all return `NOT_FOUND`** → stale bundle; rebuild.
