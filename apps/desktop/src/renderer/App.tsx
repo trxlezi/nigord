@@ -12,6 +12,7 @@ import {
   SourcePicker,
   VolumePanel,
 } from '@nigord/ui';
+import { captureFramerateFor } from '@nigord/core';
 import { bridge } from './bridge.js';
 import { useConfig } from './useConfig.js';
 import { useDevices } from './useDevices.js';
@@ -122,8 +123,10 @@ export function App(): JSX.Element {
       try {
         const granted = await bridge.invoke('capture:start', choice);
 
+        // The framerate has to be asked for here: the encoder's ceiling cannot
+        // invent frames the capture never produced.
         const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
+          video: captureFramerateFor(choice.contentKind),
           audio: granted.systemAudioGranted,
         });
 

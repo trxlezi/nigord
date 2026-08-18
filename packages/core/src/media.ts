@@ -42,6 +42,22 @@ export const systemAudioConstraints = (): MediaTrackConstraints => ({
 export const contentHintFor = (kind: ContentKind): 'motion' | 'detail' =>
   kind === 'motion' ? 'motion' : 'detail';
 
+/**
+ * Framerate asked of the capture itself, per content kind.
+ *
+ * The encoder ceiling below is only a ceiling: it cannot invent frames the
+ * capture never produced. getDisplayMedia without a frameRate constraint hands
+ * back Chromium's default — around 30 — so the 60 configured for motion was
+ * never reachable. These two have to move together, which is why they live in
+ * the same file.
+ *
+ * 'ideal' rather than 'exact': a machine that cannot sustain 60 should give
+ * what it can, not fail to capture at all.
+ */
+export const captureFramerateFor = (kind: ContentKind): MediaTrackConstraints => ({
+  frameRate: { ideal: kind === 'motion' ? 60 : 15 },
+});
+
 export interface EncodingLayer {
   readonly maxBitrateBps: number;
   readonly maxFramerate: number;
