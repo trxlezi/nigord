@@ -1,10 +1,11 @@
-import { desktopCapturer } from 'electron';
 import type { CaptureCapabilities, CaptureSource } from '@nigord/shared';
 import type { CaptureProvider } from './types.js';
+import { listDesktopSources } from './sources.js';
 
 const PLATFORM_NOTE =
-  'A captura de áudio do sistema ainda não está implementada nesta versão. ' +
-  'Compartilhar a tela funciona; o som do jogo não vai junto.';
+  'A captura de áudio do sistema não existe neste sistema operacional — ela ' +
+  'depende do loopback do Windows. Compartilhar a tela funciona; o som do ' +
+  'jogo não vai junto.';
 
 /**
  * Development stub for non-Windows platforms (task 5.4).
@@ -30,19 +31,8 @@ export class StubCaptureProvider implements CaptureProvider {
     };
   }
 
-  async listSources(): Promise<CaptureSource[]> {
-    const sources = await desktopCapturer.getSources({
-      types: ['screen', 'window'],
-      thumbnailSize: { width: 320, height: 180 },
-      fetchWindowIcons: false,
-    });
-
-    return sources.map((source) => ({
-      id: source.id,
-      name: source.name,
-      kind: source.id.startsWith('screen:') ? ('screen' as const) : ('window' as const),
-      thumbnail: source.thumbnail.isEmpty() ? null : source.thumbnail.toDataURL(),
-    }));
+  listSources(): Promise<CaptureSource[]> {
+    return listDesktopSources();
   }
 
   async beginCapture(request: {

@@ -1,7 +1,9 @@
-import type { Participant } from '@nigord/shared';
+import type { Participant, ScreenShare } from '@nigord/shared';
 
 export interface ParticipantListProps {
   participants: readonly Participant[];
+  /** Shares in progress, read for whether system audio came with each one. */
+  shares: readonly ScreenShare[];
   /** Identities this viewer has silenced locally. */
   locallyMuted: readonly string[];
   onToggleLocalMute: (identity: string) => void;
@@ -15,6 +17,7 @@ export interface ParticipantListProps {
  */
 export function ParticipantList({
   participants,
+  shares,
   locallyMuted,
   onToggleLocalMute,
 }: ParticipantListProps): JSX.Element {
@@ -22,6 +25,12 @@ export function ParticipantList({
     <ul className="roster">
       {participants.map((participant) => {
         const silenced = locallyMuted.includes(participant.identity);
+        // Whether the game audio actually made it is only knowable from the
+        // published track, and it is the one thing a sharer cannot hear for
+        // themselves — so it has to be shown, not assumed.
+        const withSystemAudio = shares.some(
+          (share) => share.identity === participant.identity && share.hasSystemAudio,
+        );
         return (
           <li
             key={participant.identity}
@@ -40,8 +49,15 @@ export function ParticipantList({
 
             <span className="roster__tags">
               {participant.isSharing && (
-                <span className="tag tag--sharing" title="Compartilhando a tela">
-                  tela
+                <span
+                  className="tag tag--sharing"
+                  title={
+                    withSystemAudio
+                      ? 'Compartilhando a tela, com o som do sistema'
+                      : 'Compartilhando a tela, sem o som do sistema'
+                  }
+                >
+                  {withSystemAudio ? 'tela + som' : 'tela'}
                 </span>
               )}
               {participant.isMuted && (

@@ -1,5 +1,6 @@
 import type { CaptureProvider } from './types.js';
 import { StubCaptureProvider } from './stub.js';
+import { WindowsCaptureProvider } from './windows.js';
 
 /**
  * The single point where the platform is decided (task 5.5).
@@ -12,10 +13,7 @@ export function createCaptureProvider(
 ): CaptureProvider {
   switch (platform) {
     case 'win32':
-      // Task 5.3, gated on the spike in task 1. Until the loopback behaviour
-      // is confirmed on real hardware, Windows deliberately gets the honest
-      // stub rather than an untested implementation.
-      return new StubCaptureProvider();
+      return new WindowsCaptureProvider();
     default:
       return new StubCaptureProvider();
   }

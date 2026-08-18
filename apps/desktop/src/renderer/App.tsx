@@ -229,6 +229,7 @@ export function App(): JSX.Element {
         <aside className="app__side">
           <ParticipantList
             participants={view.participants}
+            shares={view.shares}
             locallyMuted={prefs.locallyMuted}
             onToggleLocalMute={toggleLocalMute}
           />
