@@ -495,3 +495,41 @@ describe('local playback volumes', () => {
     expect(client.systemAudioVolumes.get('pedro')).toBe(0);
   });
 });
+
+describe('reprodução de áudio', () => {
+  it('assume que o áudio toca até a plataforma dizer o contrário', async () => {
+    // specs/voice-session: "Reprodução bloqueada pelo sistema" — o aviso existe
+    // para uma recusa real, não para o instante em que ninguém falou ainda.
+    await session.join(credentials);
+    expect(session.view.audioPlayback).toBe(true);
+  });
+
+  it('avisa quando a plataforma recusa reproduzir', async () => {
+    await session.join(credentials);
+    client.blockAudioPlayback();
+    expect(session.view.audioPlayback).toBe(false);
+  });
+
+  it('volta a reproduzir quando o participante autoriza', async () => {
+    await session.join(credentials);
+    client.blockAudioPlayback();
+
+    await session.enableAudioPlayback();
+
+    expect(session.view.audioPlayback).toBe(true);
+  });
+
+  it('mantém o aviso quando a autorização não é aceita', async () => {
+    // Registrar sucesso que não houve esconderia o aviso e deixaria o
+    // participante em silêncio sem nada mais para acionar.
+    await session.join(credentials);
+    client.blockAudioPlayback();
+    client.startAudioPlayback = async (): Promise<void> => {
+      // A plataforma recusou: nada muda.
+    };
+
+    await session.enableAudioPlayback();
+
+    expect(session.view.audioPlayback).toBe(false);
+  });
+});

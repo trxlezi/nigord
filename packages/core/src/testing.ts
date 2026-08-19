@@ -27,6 +27,7 @@ export class FakeRoomClient implements RoomClient {
   readonly sentChat: string[] = [];
   readonly voiceVolumes = new Map<string, number>();
   readonly systemAudioVolumes = new Map<string, number>();
+  audioPlaybackAllowed = true;
   connectShouldFail = false;
   micShouldFail = false;
   readonly screenStreams = new Map<string, MediaStream>();
@@ -78,6 +79,21 @@ export class FakeRoomClient implements RoomClient {
 
   async setOutputDevice(deviceId: string): Promise<void> {
     this.outputDeviceId = deviceId;
+  }
+
+  canPlayAudio(): boolean {
+    return this.audioPlaybackAllowed;
+  }
+
+  async startAudioPlayback(): Promise<void> {
+    this.audioPlaybackAllowed = true;
+    this.emitter.emit('audioPlaybackChanged', { allowed: true });
+  }
+
+  /** Lets a test put the platform in the state where it refuses to play. */
+  blockAudioPlayback(): void {
+    this.audioPlaybackAllowed = false;
+    this.emitter.emit('audioPlaybackChanged', { allowed: false });
   }
 
   screenStreamFor(identity: string): MediaStream | null {

@@ -149,9 +149,24 @@ presence, media actually arriving, simultaneous shares, expanded view, a share
 ending, a participant leaving — printing `PASSOU`/`FALHOU` per check and exiting
 non-zero if any failed.
 
-The media check is the one that matters: it reads the receiving side's
-`videoWidth`. A tab can be listed with the video frozen at zero, so the
-dimensions are the only honest proof that the stream arrived.
+The media checks are the ones that matter, and there are two, for a reason
+worth knowing before trusting a green run.
+
+For a while this script asserted only `videoWidth > 0` on the receiving side.
+It passed ten of ten scenarios against a room where **nobody could hear
+anybody** — no audio assertion existed — and recorded `960×540` as success while
+the capture was `1920×1080`. Both defects were reported by a human in a real
+session, not by the suite that had just approved the build.
+
+So it now checks:
+
+- **Audio is playing on both sides.** The adapter attaches remote audio into a
+  `#nigord-audio` container precisely so a script can see it; the check counts
+  elements that are neither paused nor empty.
+- **The received width clears a floor**, not zero. `> 0` would approve 240p.
+
+The lesson generalises past this file: it measured what was easy to measure
+rather than what the product is for.
 
 Two bugs came out of this that a single instance could never show: the roster
 only listing people who joined _after_ you, and the sharer being the one person

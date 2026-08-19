@@ -42,6 +42,14 @@ export interface RoomClientEvents {
   shareStreamReady: { identity: string };
   /** A chat line arrived from someone else in the room. */
   chatReceived: { identity: string; text: string };
+  /**
+   * Whether the platform is letting audio play changed.
+   *
+   * Blocked playback looks exactly like a broken app — connected, speaking
+   * indicators moving, complete silence — so it has to be visible rather than
+   * inferred (specs/voice-session).
+   */
+  audioPlaybackChanged: { allowed: boolean };
 }
 
 export interface RoomClient {
@@ -70,6 +78,18 @@ export interface RoomClient {
   setSystemAudioVolume(identity: string, volume: number): void;
 
   setOutputDevice(deviceId: string): Promise<void>;
+
+  /** False while the platform is refusing to play audio at all. */
+  canPlayAudio(): boolean;
+
+  /**
+   * Starts playback after a participant's gesture, for the case above.
+   *
+   * Kept as an explicit call rather than something the transport retries on its
+   * own: only a real interaction satisfies the platform, and pretending
+   * otherwise would loop silently.
+   */
+  startAudioPlayback(): Promise<void>;
 
   /**
    * The subscribed screen stream for one participant, or null while it is not

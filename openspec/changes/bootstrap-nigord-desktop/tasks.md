@@ -81,9 +81,9 @@
 
 ## 10. Validação com o grupo
 
-- [ ] 10.1 Percorrer manualmente os cenários de `specs/voice-session` e `specs/screen-sharing` na máquina Windows
+- [x] 10.1 Percorrer manualmente os cenários de `specs/voice-session` e `specs/screen-sharing` na máquina Windows — feito em 19/08/2026, e **reprovou**: voz e áudio do sistema inaudíveis, transmissão em metade da resolução
 - [ ] 10.2 Distribuir a primeira release aos amigos e realizar uma sessão com os seis conectados
-- [ ] 10.3 Verificar que o áudio do sistema chega audível e com volume independente da voz, na percepção dos participantes
+- [x] 10.3 Verificar que o áudio do sistema chega audível e com volume independente da voz, na percepção dos participantes — **falhou**: nada era reproduzido no receptor e a captura vinha filtrada. Causas e correção em `corrigir-audio-e-qualidade-da-transmissao`; a reverificação é a tarefa 6.2 de lá
 - [ ] 10.4 Verificar que todos conseguem conectar em suas redes reais, e investigar qualquer falha de travessia de NAT
 - [ ] 10.5 Calibrar bitrate e resolução máximos com base na sessão real e registrar os valores em `design.md`
 - [ ] 10.6 Medir o consumo de banda contra os limites do plano gratuito do LiveKit Cloud

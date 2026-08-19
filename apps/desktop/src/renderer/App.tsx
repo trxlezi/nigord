@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { CaptureCapabilities, CaptureSource, ContentKind } from '@nigord/shared';
 import {
   ChatPanel,
+  AudioBlockedNotice,
   ConnectionBadge,
   JoinForm,
   ParticipantList,
@@ -12,7 +13,7 @@ import {
   SourcePicker,
   VolumePanel,
 } from '@nigord/ui';
-import { captureFramerateFor } from '@nigord/core';
+import { captureFramerateFor, systemAudioConstraints } from '@nigord/core';
 import { bridge } from './bridge.js';
 import { useConfig } from './useConfig.js';
 import { useDevices } from './useDevices.js';
@@ -123,16 +124,32 @@ export function App(): JSX.Element {
       try {
         const granted = await bridge.invoke('capture:start', choice);
 
-        // The framerate has to be asked for here: the encoder's ceiling cannot
-        // invent frames the capture never produced.
+        // Both constraints have to be asked for here, and for the same reason:
+        // the platform decides at capture time and nothing downstream can undo
+        // it. The encoder cannot invent frames the capture never produced, and
+        // audio that arrived echo-cancelled cannot be un-cancelled.
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: captureFramerateFor(choice.contentKind),
-          audio: granted.systemAudioGranted,
+          // `audio: true` would hand back Chromium's voice defaults — echo
+          // cancellation, noise suppression and AGC — which is exactly what
+          // design.md D3 exists to avoid. Echo cancellation is the worst of the
+          // three here: its reference signal is the very output being captured.
+          audio: granted.systemAudioGranted ? systemAudioConstraints() : false,
         });
 
         // The system-audio track is handed over separately so it can be
         // published as its own track with its own volume (design.md D3).
         const [systemAudioTrack] = stream.getAudioTracks();
+
+        // The loopback does not always honour what was asked. Reporting the
+        // difference beats assuming success: a filtered track is audibly wrong
+        // in a way that is hard to attribute later.
+        if (systemAudioTrack) {
+          const settings = systemAudioTrack.getSettings();
+          if (settings.echoCancellation || settings.noiseSuppression || settings.autoGainControl) {
+            console.warn('Áudio do sistema veio com processamento de voz:', settings);
+          }
+        }
         await session.startSharing({
           stream,
           contentKind: choice.contentKind,
@@ -209,6 +226,10 @@ export function App(): JSX.Element {
           Preferências
         </button>
       </header>
+
+      {!view.audioPlayback && (
+        <AudioBlockedNotice onEnable={() => void session.enableAudioPlayback()} />
+      )}
 
       <div className="app__body">
         <section className="app__stage">

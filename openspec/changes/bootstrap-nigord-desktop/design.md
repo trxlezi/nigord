@@ -136,25 +136,44 @@ O envelope é versionado (`nigord.chat.v1`) e tipos desconhecidos são ignorados
 ### D11 — Resultado do spike de viabilidade (tarefa 1.4)
 
 Validado em 19/08/2026, na máquina Windows do autor (Windows 10 Pro 19045),
-contra um projeto real do LiveKit Cloud e o token server rodando local.
+contra um projeto real do LiveKit Cloud.
 
-| Premissa                                        | Resultado                                                                        |
-| ----------------------------------------------- | -------------------------------------------------------------------------------- |
-| Áudio do sistema junto da tela (1.1)            | ✅ o som do que toca na máquina vai com o compartilhamento                        |
-| Track de áudio separada da voz (1.2)            | ✅ aparece como fonte própria no mixer, com indicação de nível independente        |
-| Atalho global com jogo em foco (1.3)            | ✅ o push-to-talk é recebido                                                       |
+| Premissa                             | Resultado                                                                         |
+| ------------------------------------ | --------------------------------------------------------------------------------- |
+| Áudio do sistema junto da tela (1.1) | ✅ a faixa de loopback é aberta e carrega sinal                                    |
+| Faixa separada da voz (1.2)          | ✅ é publicada como fonte própria, com nível independente no mixer                 |
+| Atalho global com jogo em foco (1.3) | ✅ o push-to-talk é recebido                                                       |
 
-A premissa central do projeto — loopback de áudio do Windows pelo Electron — se
-sustenta. Nada aqui contradiz D9: o vídeo continua sujeito ao comportamento do
-WGC, e a pergunta em aberto naquela decisão (se o loopback depende do
-capturador) permanece sem medição, porque este teste rodou com o padrão.
+**O que este spike NÃO validou, e o texto anterior dava a entender que sim.**
+Tudo acima foi observado no lado de quem **envia** — o mixer do Windows, a
+publicação, o indicador de nível. Nada aqui tocou o lado de quem **recebe**.
+
+A primeira sessão real, no mesmo dia, mostrou o que faltava: ninguém escutava
+ninguém. Duas causas, ambas medidas depois:
+
+1. **Áudio remoto nunca era reproduzido.** O `livekit-client` assina a faixa e
+   só toca o que a aplicação anexa a um elemento; nada anexava. A sala inteira
+   ficava muda, com presença, indicador de fala e vídeo funcionando — que é o
+   que tornou o defeito tão difícil de atribuir.
+2. **A captura de loopback vinha com os filtros de voz ligados.**
+   `systemAudioConstraints()` existia, estava documentada e nunca era chamada,
+   então o áudio do sistema chegava com cancelamento de eco, supressão de ruído
+   e AGC — em mono. O cancelamento de eco é o mais grave: seu sinal de
+   referência é a própria saída que está sendo capturada.
+
+A premissa central — o loopback do Windows pelo Electron — continua de pé. O
+erro foi de método, não de arquitetura: um spike que mede só a origem prova
+metade do caminho e parece provar o todo.
 
 **Multi-participante no Windows.** O `two-participants.mjs` passou a rodar
 também no Windows — sem `xvfb`, sobre a área de trabalho real, com o processo
-encerrado por `taskkill /T` já que não há grupo de processos para sinalizar. Os
-dez cenários de `specs/screen-sharing` passaram, com o vídeo chegando em
-960×540 no receptor. O que continua fora do alcance de qualquer script é o anel
-3: seis pessoas, redes reais, jogos reais.
+encerrado por `taskkill /T` já que não há grupo de processos para sinalizar.
+
+Os dez cenários passaram, e passaram numa sala muda: o roteiro media
+`videoWidth > 0` e nada de áudio. Também registrou "960×540 no receptor" como
+sinal de sucesso, quando a captura era 1920×1080 — metade da resolução, anotada
+sem que ninguém percebesse. Ambos os pontos cegos são tratados na mudança
+`corrigir-audio-e-qualidade-da-transmissao`.
 
 ## Risks / Trade-offs
 

@@ -35,6 +35,12 @@ export interface SessionView {
   /** Chat for this session only, oldest first. Never persisted. */
   chat: readonly ChatMessage[];
   /**
+   * False while the platform refuses to play audio, which needs a gesture to
+   * clear. Distinct from being muted: nothing is heard at all, and without
+   * saying so the room is silent for no visible reason.
+   */
+  audioPlayback: boolean;
+  /**
    * Bumped whenever a remote screen stream becomes available. The streams
    * themselves are not part of the view — they are mutable media objects, not
    * state — so this is what tells a renderer to re-read them.
@@ -75,6 +81,9 @@ export class Session {
   private localIdentity = '';
   private streamRevision = 0;
   private chat: ChatMessage[] = [];
+  // Assumed allowed until the transport says otherwise: the warning must appear
+  // because playback was refused, never merely because nothing was heard yet.
+  private audioPlayback = true;
   private chatSequence = 0;
 
   constructor(options: SessionOptions) {
@@ -204,6 +213,19 @@ export class Session {
     await this.openMicrophone();
   }
 
+  /**
+   * Asks the platform to start playing audio, after a participant's gesture.
+   *
+   * The view is refreshed from what the transport reports rather than from the
+   * attempt succeeding: a refusal that we recorded as success would hide the
+   * warning and leave the participant in silence with nothing left to click.
+   */
+  async enableAudioPlayback(): Promise<void> {
+    await this.client.startAudioPlayback();
+    this.audioPlayback = this.client.canPlayAudio();
+    this.publishView();
+  }
+
   setOutputDevice(deviceId: string): Promise<void> {
     return this.client.setOutputDevice(deviceId);
   }
@@ -309,6 +331,7 @@ export class Session {
       hasMicrophone: this.micAvailable,
       isSharing: this.sharing,
       chat: this.chat,
+      audioPlayback: this.audioPlayback,
       streamRevision: this.streamRevision,
     };
   }
@@ -348,6 +371,11 @@ export class Session {
       // one room's messages into the next one.
       this.chat = [];
       this.apply({ type: 'DISCONNECT', reason });
+    });
+
+    sub('audioPlaybackChanged', ({ allowed }) => {
+      this.audioPlayback = allowed;
+      this.publishView();
     });
 
     sub('chatReceived', ({ identity, text }) => {

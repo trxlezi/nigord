@@ -6,6 +6,7 @@ import {
   Room,
   RoomEvent,
   Track,
+  VideoPreset,
   type RemoteAudioTrack,
   type RemoteParticipant,
   type RemoteTrackPublication,
@@ -40,6 +41,9 @@ import {
  */
 const SYSTEM_AUDIO_TRACK_NAME = 'nigord-system-audio';
 const SCREEN_TRACK_NAME = 'nigord-screen';
+
+/** Holds the audio elements this adapter creates. See playRemoteAudio. */
+const AUDIO_CONTAINER_ID = 'nigord-audio';
 
 /**
  * Chat travels on the room's data channel as a tagged JSON envelope.
@@ -151,20 +155,53 @@ export class LiveKitRoomClient implements RoomClient {
     videoTrack.contentHint = contentHintFor(contentKind);
 
     this.screenTrack = new LocalVideoTrack(videoTrack, undefined, false);
-    const [topLayer] = screenShareLayers(contentKind);
+    const [topLayer, ...lowerLayers] = screenShareLayers(contentKind);
+    const settings = videoTrack.getSettings();
+    const width = settings.width ?? 0;
+    const height = settings.height ?? 0;
+
     await this.publish(this.screenTrack, {
       source: Track.Source.ScreenShare,
       name: SCREEN_TRACK_NAME,
       simulcast: true,
+      // Keep the pixels, spend the framerate. The encoder's default under this
+      // content hint is the opposite — it protects framerate and scales the
+      // image down — and a screen share that arrives at half resolution is
+      // unreadable in a way that a few dropped frames never is. Measured: a
+      // 1920×1080 capture reaching a 1888×1016 viewer at 960×540.
+      degradationPreference: 'maintain-resolution',
+      // The lower layers were described in media.ts and never reached the SDK,
+      // which was left to invent its own. Passing them is what makes
+      // scaleDownBy mean something.
+      ...(lowerLayers.length > 0 && width > 0 && height > 0
+        ? {
+            screenShareSimulcastLayers: lowerLayers.map(
+              (layer) =>
+                new VideoPreset(
+                  Math.floor(width / layer.scaleDownBy),
+                  Math.floor(height / layer.scaleDownBy),
+                  layer.maxBitrateBps,
+                  layer.maxFramerate,
+                ),
+            ),
+          }
+        : {}),
+      // screenShareEncoding, não videoEncoding: para uma track de tela o SDK lê
+      // este campo e ignora o outro. Com o nome errado, tudo em media.ts era
+      // decorativo e o que subia eram os padrões do LiveKit — 1080p a 15
+      // quadros e 2,5 Mbps, medidos numa sessão real como "muito feio" para um
+      // jogo. O erro era invisível porque a chave existe e é válida.
       ...(topLayer
         ? {
-            videoEncoding: {
+            screenShareEncoding: {
               maxBitrate: topLayer.maxBitrateBps,
               maxFramerate: topLayer.maxFramerate,
             },
           }
         : {}),
     });
+
+    this.reportScreenEncodings();
 
     if (systemAudioTrack) {
       // Published as its own track so viewers can lower the game without
@@ -178,6 +215,32 @@ export class LiveKitRoomClient implements RoomClient {
         red: false,
       });
     }
+  }
+
+  /**
+   * Logs the encodings the browser actually negotiated for the screen share.
+   *
+   * What is asked for and what is sent are different things, and the gap is
+   * invisible without this: a 1920×1080 capture was delivered at 960×540 for a
+   * whole release, and nothing in the app could have shown why.
+   */
+  private reportScreenEncodings(): void {
+    const sender = this.screenTrack?.sender;
+    if (!sender) return;
+    const encodings = sender.getParameters().encodings ?? [];
+    const summary = encodings.map((e) => ({
+      rid: e.rid,
+      ativa: e.active,
+      escala: e.scaleResolutionDownBy,
+      bitrate: e.maxBitrate,
+      fps: e.maxFramerate,
+    }));
+    console.info('nigord: camadas publicadas', JSON.stringify(summary));
+    // Também num global, porque o diagnóstico útil é o que um roteiro consegue
+    // ler sem depender de capturar console.
+    (globalThis as unknown as { __nigordEncodings?: unknown }).__nigordEncodings = summary;
+    (globalThis as unknown as { __nigordCapture?: unknown }).__nigordCapture =
+      this.screenTrack?.mediaStreamTrack.getSettings();
   }
 
   async sendChat(text: string): Promise<void> {
@@ -215,6 +278,65 @@ export class LiveKitRoomClient implements RoomClient {
   }
 
   // ---- playback ------------------------------------------------------------
+
+  /**
+   * Remote audio is silent until something attaches it (specs/voice-session,
+   * "Reprodução da voz recebida").
+   *
+   * livekit-client subscribes the track and hands it over; it never plays it.
+   * attach() creates the element, sets srcObject and calls play(). React never
+   * sees these elements — their lifetime is the track's, not a component's
+   * (design D1).
+   *
+   * They are put inside a container in the document rather than left floating:
+   * a detached element plays, but nothing outside this file can observe that it
+   * is playing, and "o áudio saiu?" is exactly the question that went
+   * unanswered through a whole real session. The container makes the answer
+   * inspectable (specs/voice-session, "Saída de áudio verificável").
+   *
+   * This is also what makes setVolume meaningful: it acts on the attached
+   * elements, so without this call every volume control was inert.
+   */
+  private playRemoteAudio(track: RemoteAudioTrack): void {
+    const element = track.attach();
+    element.dataset['nigordAudio'] = 'remote';
+    this.audioContainer().append(element);
+  }
+
+  /**
+   * Where the audio elements live. Hidden, but present: `display: none` would
+   * be enough for layout and is deliberately avoided, since some browsers treat
+   * hidden media as a reason to throttle it.
+   */
+  private audioContainer(): HTMLElement {
+    const existing = document.getElementById(AUDIO_CONTAINER_ID);
+    if (existing) return existing;
+
+    const container = document.createElement('div');
+    container.id = AUDIO_CONTAINER_ID;
+    container.style.position = 'absolute';
+    container.style.width = '0';
+    container.style.height = '0';
+    container.style.overflow = 'hidden';
+    document.body.append(container);
+    return container;
+  }
+
+  /**
+   * Whether the platform is currently letting audio play at all.
+   *
+   * Browsers refuse playback that no gesture authorised, and a refusal is
+   * indistinguishable from a broken app: everything looks connected and nothing
+   * is heard. The session surfaces this so the participant can act on it.
+   */
+  canPlayAudio(): boolean {
+    return this.room.canPlaybackAudio;
+  }
+
+  /** Asks the platform to start playback, after a participant's gesture. */
+  async startAudioPlayback(): Promise<void> {
+    await this.room.startAudio();
+  }
 
   setVoiceVolume(identity: string, volume: number): void {
     this.forEachAudioTrack(identity, (track, publication) => {
@@ -319,9 +441,20 @@ export class LiveKitRoomClient implements RoomClient {
           hasSystemAudio,
         });
       })
-      .on(RoomEvent.TrackSubscribed, (_track, publication, participant) => {
+      .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        if (track.kind === Track.Kind.Audio) this.playRemoteAudio(track as RemoteAudioTrack);
         if (publication.source !== Track.Source.ScreenShare) return;
         this.emitter.emit('shareStreamReady', { identity: participant.identity });
+      })
+      .on(RoomEvent.TrackUnsubscribed, (track) => {
+        // detach() returns the elements it removed the stream from; they are
+        // ours, so they are removed from the document too. Otherwise a
+        // departed participant leaves a silent element behind on every join.
+        if (track.kind !== Track.Kind.Audio) return;
+        for (const element of track.detach()) element.remove();
+      })
+      .on(RoomEvent.AudioPlaybackStatusChanged, () => {
+        this.emitter.emit('audioPlaybackChanged', { allowed: this.room.canPlaybackAudio });
       })
       .on(RoomEvent.TrackUnpublished, (publication, participant) => {
         if (publication.source !== Track.Source.ScreenShare) return;

@@ -228,6 +228,19 @@ body {
   font-size: 12px;
 }
 
+/* Áudio bloqueado pelo sistema: uma faixa no topo, porque o sintoma é a sala
+   inteira em silêncio e não um controle específico. */
+.audio-blocked {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  background: rgb(229 100 109 / 12%);
+  color: var(--danger);
+  font-size: 13px;
+  border-bottom: 1px solid rgb(229 100 109 / 24%);
+}
+
 .alert {
   margin: 0;
   padding: 9px 11px;

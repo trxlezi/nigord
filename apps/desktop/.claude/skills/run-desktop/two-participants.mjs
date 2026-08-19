@@ -5,8 +5,9 @@
 // only listing people who joined after you, and the sharer not being marked as
 // sharing. Both looked fine with one participant.
 //
-// The single-instance lock is keyed on userData, so the second app gets its own
-// --user-data-dir. Both use Chromium's fake media devices; under Xvfb there is
+// The single-instance lock is keyed on userData, so each app gets its own
+// --user-data-dir — including the first, or an installed Nigord sitting in the
+// tray blocks the run. Both use Chromium's fake media devices; under Xvfb there is
 // no camera, microphone or screen content otherwise.
 //
 // Needs a reachable token server:
@@ -117,14 +118,25 @@ async function connect(port) {
   throw new Error(`no page target on ${port}`);
 }
 
+/**
+ * A sala do teste é dedicada, e não a que o formulário oferece por padrão.
+ *
+ * O padrão é `sala-principal` — onde o grupo realmente conversa. Um roteiro que
+ * a usa despeja dois participantes e uma tela compartilhada no meio da conversa
+ * de outras pessoas, o que já aconteceu.
+ */
+const SALA_DE_TESTE = 'sala-de-teste-automatizado';
+
 const joinAs = async (evaluate, name) => {
   await evaluate(`
     (() => {
-      const el = document.querySelector('.join input');
-      if (!el) return 'JA_NA_SALA';
+      const inputs = [...document.querySelectorAll('.join input')];
+      if (inputs.length < 2) return 'JA_NA_SALA';
       const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-      set.call(el, ${JSON.stringify(name)});
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      set.call(inputs[0], ${JSON.stringify(name)});
+      inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+      set.call(inputs[1], ${JSON.stringify(SALA_DE_TESTE)});
+      inputs[1].dispatchEvent(new Event('input', { bubbles: true }));
       document.querySelector('form').requestSubmit();
       return 'ok';
     })()
@@ -139,7 +151,10 @@ const joinAs = async (evaluate, name) => {
 const procs = [];
 let failed = false;
 try {
-  procs.push(launch(9500, null));
+  // Ambos com perfil próprio, e não só o segundo: com o userData padrão, um
+  // Nigord instalado e aberto — inclusive minimizado na bandeja — segura o
+  // bloqueio de instância única e este roteiro morre sem chegar a rodar.
+  procs.push(launch(9500, join(TMP, 'nigord-participante-a')));
   procs.push(launch(9501, join(TMP, 'nigord-participante-b')));
 
   const a = await connect(9500);
@@ -212,6 +227,23 @@ try {
         return v ? { largura: v.videoWidth, altura: v.videoHeight, tocando: !v.paused } : 'sem vídeo';
       })()`);
 
+  /**
+   * O áudio remoto, que a versão anterior deste roteiro nunca olhou — e foi
+   * assim que dez cenários passaram numa sala completamente muda.
+   *
+   * Os elementos ficam num contêiner conhecido justamente para poderem ser
+   * medidos: `readyState > 0` e `!paused` separam "existe" de "está tocando".
+   */
+  const audio = (who) =>
+    who.evaluate(`
+      (() => {
+        const els = [...document.querySelectorAll('#nigord-audio audio')];
+        return {
+          elementos: els.length,
+          tocando: els.filter((a) => !a.paused && a.readyState > 0).length,
+        };
+      })()`);
+
   const results = [];
   const check = (name, passed, detail) => {
     results.push({ name, passed });
@@ -221,6 +253,20 @@ try {
   console.log('\n[presença] quem já estava na sala aparece para quem chega depois');
   const rosterB = await roster(b);
   check('B vê A, que entrou antes', String(rosterB).includes('trxlezi'), JSON.stringify(rosterB));
+
+  console.log('\n[voz] o áudio remoto realmente toca');
+  const audioB = await audio(b);
+  check(
+    'B está reproduzindo a voz de A',
+    typeof audioB === 'object' && audioB.tocando > 0,
+    JSON.stringify(audioB),
+  );
+  const audioA = await audio(a);
+  check(
+    'A está reproduzindo a voz de B',
+    typeof audioA === 'object' && audioA.tocando > 0,
+    JSON.stringify(audioA),
+  );
 
   console.log('\n[compartilhar] a mídia chega do outro lado');
   await share(a, 'A');
@@ -233,6 +279,21 @@ try {
   // The dimensions are the only honest proof: the tab can be there with the
   // video frozen at zero.
   check('o vídeo realmente chega em B', typeof v === 'object' && v.largura > 0, JSON.stringify(v));
+
+  // A resolução ENTREGUE depende da banda de quem assiste, e com duas
+  // instâncias no mesmo enlace ela cai legitimamente para a camada baixa —
+  // afirmar um piso aqui reprovaria a rede, não o código. O que o código
+  // controla é o que se publica, e é isso que se afirma: a camada de topo tem
+  // de existir em resolução plena. Foi a ausência dela, por um campo com o nome
+  // errado, que entregou 15 quadros por segundo durante uma release inteira.
+  const camadas = await a.evaluate(`JSON.stringify(window.__nigordEncodings ?? [])`);
+  const topo = JSON.parse(String(camadas)).find((c) => c.escala === 1);
+  check(
+    'A publica uma camada em resolução plena',
+    Boolean(topo) && topo.ativa === true,
+    String(camadas),
+  );
+  console.log('    resolução entregue a B:', JSON.stringify(v));
 
   console.log('\n[simultâneos] mais de uma transmissão ao mesmo tempo');
   await share(b, 'B');

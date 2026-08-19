@@ -2,7 +2,7 @@
 
 Voz e compartilhamento de tela para grupos pequenos. Um aplicativo desktop para jogar com amigos — sem comunidades, sem chat, sem descoberta. Só o que importa: falar e mostrar a tela, com o áudio do jogo junto.
 
-> **Status:** em construção. O token server, o núcleo de sessão, o invólucro Electron e a interface estão implementados e testados, e a captura de áudio do sistema e o push-to-talk global foram validados em Windows real. Falta a sessão com o grupo em redes reais, e a implantação do token server. Progresso em [`tasks.md`](openspec/changes/bootstrap-nigord-desktop/tasks.md).
+> **Status:** em construção, e a primeira sessão real reprovou. O token server está no ar, o aplicativo conecta, a tela chega e o chat funciona — mas ninguém escutava ninguém, porque o áudio recebido nunca era reproduzido, e a transmissão chegava em metade da resolução capturada. As causas foram medidas e a correção está em [`corrigir-audio-e-qualidade-da-transmissao`](openspec/changes/corrigir-audio-e-qualidade-da-transmissao/proposal.md). Progresso em [`tasks.md`](openspec/changes/bootstrap-nigord-desktop/tasks.md).
 
 ## Por que existe
 
