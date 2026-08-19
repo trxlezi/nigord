@@ -62,6 +62,6 @@
 
 ## 6. Distribuição
 
-- [ ] 6.1 Publicar uma release nova com as correções
+- [x] 6.1 Publicar uma release nova com as correções — v0.5.0
 - [ ] 6.2 Repetir a sessão com o amigo e confirmar os três sintomas originais:
       voz audível, som do jogo audível e separado, imagem nítida
