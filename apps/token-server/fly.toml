@@ -4,9 +4,9 @@
 # a raiz, porque o pnpm precisa do manifesto do workspace e do lockfile, que
 # ficam acima deste diretório.
 #
-#   fly deploy --config apps/token-server/fly.toml --dockerfile apps/token-server/Dockerfile
+#   fly deploy --config apps/token-server/fly.toml --dockerfile apps/token-server/Dockerfile --remote-only
 #
-# NÃO VERIFICADO: o deploy nunca rodou. Trate o primeiro como o teste.
+# Verificado em 19/08/2026: no ar em https://nigord-token.fly.dev.
 
 app = 'nigord-token'
 primary_region = 'gru'

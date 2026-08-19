@@ -1,12 +1,12 @@
 ---
 name: run-desktop
-description: Build, run, screenshot and drive the Nigord Electron desktop app on Linux. Use when asked to start the desktop app, take a screenshot of the UI, click through it, exercise its IPC/bridge surface, or confirm a change works in the real app rather than only in tests.
+description: Build, run, screenshot and drive the Nigord Electron desktop app on Linux or Windows. Use when asked to start the desktop app, take a screenshot of the UI, click through it, exercise its IPC/bridge surface, or confirm a change works in the real app rather than only in tests.
 ---
 
 Nigord is an Electron app (main + preload + React renderer). Drive it with the
-CDP driver at `.claude/skills/run-desktop/driver.mjs`: it launches the app under
-`xvfb-run`, speaks the Chrome DevTools Protocol over Node's built-in `fetch` and
-`WebSocket`, and needs no extra dependencies — `playwright-core` is not installed
+CDP driver at `.claude/skills/run-desktop/driver.mjs`: it speaks the Chrome
+DevTools Protocol over Node's built-in `fetch` and `WebSocket`, and needs no
+extra dependencies — `playwright-core` is not installed
 here and neither is `tmux`.
 
 **All paths below are relative to `apps/desktop/`.**
@@ -18,8 +18,16 @@ out every later run.
 
 ## Prerequisites
 
-`xvfb-run` is required and already present at `/usr/bin/xvfb-run`. Nothing else
-had to be installed on this machine.
+**Linux:** `xvfb-run` is required and already present at `/usr/bin/xvfb-run`.
+The driver launches the app under it.
+
+**Windows:** nothing extra. The driver detects `win32`, skips `xvfb-run`, runs
+`dist/electron.exe` on the real desktop, and kills the tree with
+`taskkill /T /F` — Windows has no process group to signal. Screenshots go to
+`%TEMP%\nigord-shots` instead of `/tmp`. Two differences follow from having a
+real desktop: the capture picker lists real screens rather than the app's own
+window, and the fake media devices stay opt-in (`FAKE_MEDIA=1`), since there is
+a real microphone.
 
 The Electron binary is the one real trap. `pnpm dev:desktop` fails with
 `Error: Electron uninstall` because pnpm skipped Electron's install script, and
@@ -63,7 +71,7 @@ ss erro-de-rede
 EOF
 ```
 
-Screenshots land in `/tmp/nigord-shots/` (override with `SCREENSHOT_DIR`).
+Screenshots land in `/tmp/nigord-shots/` (`%TEMP%\nigord-shots` on Windows) (override with `SCREENSHOT_DIR`).
 **Open the PNG and look at it** — a blank frame means the launch failed.
 
 Exit code is 1 if any command reported `NOT_FOUND`, `TIMEOUT` or `ERROR`, so it
@@ -131,6 +139,11 @@ PORT=3300 pnpm --filter @nigord/token-server start   # needs .env at the repo ro
 NIGORD_TOKEN_SERVER=http://127.0.0.1:3300 NIGORD_GROUP_SECRET=<segredo>   node .claude/skills/run-desktop/two-participants.mjs
 ```
 
+It runs on Windows too, with the same command. Kill any app started by
+`pnpm dev:desktop` first: participant A uses the default userData directory, so
+a running dev instance holds the single-instance lock and A exits immediately.
+Ten of ten scenarios passed there on 19/08/2026, video arriving at 960×540.
+
 It walks ten checks across the multi-party scenarios in `specs/screen-sharing` —
 presence, media actually arriving, simultaneous shares, expanded view, a share
 ending, a participant leaving — printing `PASSOU`/`FALHOU` per check and exiting
@@ -173,6 +186,8 @@ pnpm -w check         # lint + typecheck + tests
   next launch exit _instantly_ through the single-instance lock (task 6.5),
   which looks like a launch failure but is the app working correctly. The driver
   spawns detached and kills the whole process group.
+- **On Windows, `Stop-Process -Name electron` is the blunt cleanup** when a run
+  leaves survivors; the driver's own `taskkill /T` handles the normal path.
 - **`pkill -f <pattern>` kills the agent's own shell**, because the pattern
   appears in the shell's command line. Filter `ps -eo pid,args` instead.
 - **The page target exists before React mounts.** Commands issued too early get

@@ -4,10 +4,10 @@ O aplicativo não funciona sem este serviço: ele é quem guarda as chaves do
 LiveKit e emite as credenciais de sala. Nenhum participante precisa dele
 instalado — só precisa do endereço e do segredo do grupo.
 
-> **Nada aqui foi executado.** A máquina de desenvolvimento não tem Docker nem
-> `flyctl`, então a imagem nunca foi construída e o deploy nunca rodou. Os
-> comandos abaixo são o caminho pretendido, não um caminho verificado. Trate o
-> primeiro deploy como o teste — e veja "Se falhar" no fim.
+> **Verificado em 19/08/2026.** O serviço está no ar em
+> `https://nigord-token.fly.dev`, implantado do Windows com `flyctl` v0.4.84 e o
+> builder remoto do Fly — não é preciso Docker na máquina. As três conferências
+> da seção 4 passaram.
 
 ## 1. Chaves do LiveKit
 
@@ -39,11 +39,12 @@ Do **diretório raiz do repositório**:
 
 ```bash
 fly auth login
-fly launch --config apps/token-server/fly.toml --no-deploy
+fly apps create nigord-token --org personal
 ```
 
-`fly launch` vai propor um nome — se aceitar um diferente de `nigord-token`,
-ele mesmo atualiza o `app` no `fly.toml`.
+`fly launch` também serve, mas é interativo e propõe reescrever o `fly.toml`
+que já está pronto aqui. `fly apps create` faz só o que falta. Se o nome já
+estiver tomado por outra conta, escolha outro e ajuste `app` no `fly.toml`.
 
 Depois configure os segredos (eles ficam no Fly, nunca no repositório):
 
@@ -59,7 +60,17 @@ fly secrets set \
 E implante:
 
 ```bash
-fly deploy --config apps/token-server/fly.toml --dockerfile apps/token-server/Dockerfile
+fly deploy --config apps/token-server/fly.toml --dockerfile apps/token-server/Dockerfile --remote-only
+```
+
+`--remote-only` constrói a imagem no builder do Fly. É o que dispensa Docker na
+máquina — e no Windows é o caminho normal, não um contorno.
+
+O Fly cria **duas** máquinas por padrão, para alta disponibilidade. Seis amigos
+não precisam disso, e é franquia gasta à toa:
+
+```bash
+fly scale count 1 --app nigord-token
 ```
 
 ## 4. Conferir
@@ -84,11 +95,17 @@ digita na primeira execução do app.
 
 ## Se falhar
 
-O ponto mais provável de quebra é o `pnpm install` dentro da imagem: o
-`Dockerfile` copia o manifesto do workspace, o lockfile e apenas os dois
-pacotes de que este serviço depende. Se a instalação reclamar de um pacote
-ausente, é porque uma dependência nova entrou no workspace e precisa ser
-copiada também.
+O que de fato quebrou no primeiro deploy foi o **contexto de build**, não o
+`pnpm install`: sem `.dockerignore` na raiz, o Docker tenta empacotar o
+`node_modules` inteiro, e a árvore de links do pnpm no Windows não cabe num tar
+(`archive/tar: unknown file mode ?rwxr-xr-x`). O `.dockerignore` da raiz existe
+por causa disso — se alguém o remover, o deploy volta a falhar exatamente
+assim.
+
+O outro ponto provável é o `pnpm install` dentro da imagem: o `Dockerfile`
+copia o manifesto do workspace, o lockfile e apenas os dois pacotes de que este
+serviço depende. Se a instalação reclamar de um pacote ausente, é porque uma
+dependência nova entrou no workspace e precisa ser copiada também.
 
 O serviço falha ao iniciar de propósito quando falta qualquer chave, com a
 mensagem dizendo qual — `fly logs` mostra exatamente essa linha.

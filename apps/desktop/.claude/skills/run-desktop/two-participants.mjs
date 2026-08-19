@@ -17,9 +17,15 @@
 //
 // It prints each step and ends with the video dimensions on the receiving side.
 // Zeros there mean the media never arrived, whatever the UI claims.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+
+// Windows has no xvfb: the app launches onto the real desktop, which is also
+// why the capture picker there lists real screens instead of a single window.
+const WINDOWS = process.platform === 'win32';
+const TMP = tmpdir();
 
 const APP_DIR = resolve(import.meta.dirname, '../../..');
 const REPO = resolve(APP_DIR, '../..');
@@ -30,23 +36,38 @@ const electron = join(
     .filter((e) => /^electron@\d/.test(e))
     .sort()
     .reverse()[0],
-  'node_modules/electron/dist/electron',
+  WINDOWS ? 'node_modules/electron/dist/electron.exe' : 'node_modules/electron/dist/electron',
 );
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function launch(port, userDataDir) {
-  const args = [
-    '-a',
-    '--server-args=-screen 0 1280x800x24',
-    electron,
+  const appArgs = [
     APP_DIR,
     '--no-sandbox',
     `--remote-debugging-port=${port}`,
     '--use-fake-device-for-media-stream',
     '--use-fake-ui-for-media-stream',
   ];
-  if (userDataDir) args.push(`--user-data-dir=${userDataDir}`);
+  if (userDataDir) appArgs.push(`--user-data-dir=${userDataDir}`);
+  if (WINDOWS) {
+    // detached so the window is not tied to this console; the tree is killed
+    // through taskkill, since Windows has no process groups to signal.
+    return spawn(electron, appArgs, { cwd: REPO, detached: true, stdio: 'ignore' });
+  }
+  const args = ['-a', '--server-args=-screen 0 1280x800x24', electron, ...appArgs];
   return spawn('xvfb-run', args, { cwd: REPO, detached: true, stdio: 'ignore' });
+}
+
+/** Killing the wrapper leaves Electron alive, and a survivor holds the
+ * single-instance lock that makes the next run exit instantly. */
+function kill(child) {
+  try {
+    if (WINDOWS)
+      spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    else process.kill(-child.pid, 'SIGKILL');
+  } catch {
+    // already gone
+  }
 }
 
 async function connect(port) {
@@ -119,7 +140,7 @@ const procs = [];
 let failed = false;
 try {
   procs.push(launch(9500, null));
-  procs.push(launch(9501, '/tmp/nigord-participante-b'));
+  procs.push(launch(9501, join(TMP, 'nigord-participante-b')));
 
   const a = await connect(9500);
   const b = await connect(9501);
@@ -165,8 +186,9 @@ try {
   const share = async (who, label) => {
     await who.evaluate(clickText('Compartilhar tela'));
     if (!(await waitFor(who, '.picker', `picker de ${label}`))) return false;
-    // Each xvfb-run gets its own display, so the only capturable source is the
-    // app's own window — and it is not mapped the instant the picker opens.
+    // Under Xvfb the only capturable source is the app's own window; on Windows
+    // the real screens are listed. Either way the list is not populated the
+    // instant the picker opens.
     if (!(await waitFor(who, '.thumb', `fonte de ${label}`))) return false;
     await who.evaluate(`document.querySelector('.thumb')?.click()`);
     await sleep(400);
@@ -247,7 +269,7 @@ try {
   await sleep(5000);
   check('A some do roster de B', !String(await roster(b)).includes('trxlezi'));
 
-  const shotDir = process.env.SCREENSHOT_DIR || '/tmp/nigord-shots';
+  const shotDir = process.env.SCREENSHOT_DIR || join(TMP, 'nigord-shots');
   mkdirSync(shotDir, { recursive: true });
   const file = join(shotDir, 'dois-participantes.png');
   const shot = await b.send('Page.captureScreenshot', { format: 'png' });
@@ -258,12 +280,6 @@ try {
   console.log(`\n${results.length - falhas.length}/${results.length} cenários passaram`);
   failed = falhas.length > 0;
 } finally {
-  for (const p of procs) {
-    try {
-      process.kill(-p.pid, 'SIGKILL');
-    } catch {
-      // already gone
-    }
-  }
+  for (const p of procs) kill(p);
 }
 process.exit(failed ? 1 : 0);

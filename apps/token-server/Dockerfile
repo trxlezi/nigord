@@ -1,11 +1,11 @@
 # Token server image for Fly.io / Railway / any container host.
 #
-# NOT VERIFIED LOCALLY: this machine has no Docker, so the image has never been
-# built. The commands inside are the ones that work outside a container; treat
-# the first deploy as the test.
+# Built and deployed on 19/08/2026 through Fly's remote builder.
 #
 # The build context is the REPO ROOT, not this directory — pnpm needs the
-# workspace manifest and the lockfile to install a workspace package.
+# workspace manifest and the lockfile to install a workspace package. The root
+# .dockerignore is what makes that context sane; without it the build fails
+# while packing node_modules.
 #   docker build -f apps/token-server/Dockerfile .
 FROM node:22-slim
 

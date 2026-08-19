@@ -133,6 +133,29 @@ Então o escopo se divide onde o custo se divide: o chat existe enquanto a sala 
 
 O envelope é versionado (`nigord.chat.v1`) e tipos desconhecidos são ignorados em vez de recusados, para que um cliente antigo continue utilizável quando um mais novo passar a enviar algo que ele nunca viu.
 
+### D11 — Resultado do spike de viabilidade (tarefa 1.4)
+
+Validado em 19/08/2026, na máquina Windows do autor (Windows 10 Pro 19045),
+contra um projeto real do LiveKit Cloud e o token server rodando local.
+
+| Premissa                                        | Resultado                                                                        |
+| ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| Áudio do sistema junto da tela (1.1)            | ✅ o som do que toca na máquina vai com o compartilhamento                        |
+| Track de áudio separada da voz (1.2)            | ✅ aparece como fonte própria no mixer, com indicação de nível independente        |
+| Atalho global com jogo em foco (1.3)            | ✅ o push-to-talk é recebido                                                       |
+
+A premissa central do projeto — loopback de áudio do Windows pelo Electron — se
+sustenta. Nada aqui contradiz D9: o vídeo continua sujeito ao comportamento do
+WGC, e a pergunta em aberto naquela decisão (se o loopback depende do
+capturador) permanece sem medição, porque este teste rodou com o padrão.
+
+**Multi-participante no Windows.** O `two-participants.mjs` passou a rodar
+também no Windows — sem `xvfb`, sobre a área de trabalho real, com o processo
+encerrado por `taskkill /T` já que não há grupo de processos para sinalizar. Os
+dez cenários de `specs/screen-sharing` passaram, com o vídeo chegando em
+960×540 no receptor. O que continua fora do alcance de qualquer script é o anel
+3: seis pessoas, redes reais, jogos reais.
+
 ## Risks / Trade-offs
 
 - **A captura de áudio de loopback no Windows via Electron não se comporta como esperado** → Esta é a premissa técnica central de todo o projeto. Validar com um spike isolado na máquina Windows *antes* de qualquer trabalho de interface. Se falhar, a abordagem inteira precisa ser revista, e é melhor saber na primeira semana.

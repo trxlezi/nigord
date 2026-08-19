@@ -1,9 +1,9 @@
 ## 1. Spike de viabilidade (máquina Windows, antes de tudo)
 
-- [ ] 1.1 Criar um Electron mínimo e descartável na máquina Windows que capture tela + áudio do sistema via `setDisplayMediaRequestHandler` com loopback, e reproduza o áudio localmente
-- [ ] 1.2 Confirmar que a track de áudio do sistema chega separada da track de microfone e que a qualidade do áudio do jogo é aceitável sem processamento de voz
-- [ ] 1.3 Registrar um atalho global e verificar se ele é recebido com um jogo em fullscreen exclusivo em foco
-- [ ] 1.4 Registrar o resultado dos três testes em `design.md`; se 1.1 ou 1.2 falharem, interromper e revisar a abordagem antes de prosseguir
+- [x] 1.1 Criar um Electron mínimo e descartável na máquina Windows que capture tela + áudio do sistema via `setDisplayMediaRequestHandler` com loopback, e reproduza o áudio localmente
+- [x] 1.2 Confirmar que a track de áudio do sistema chega separada da track de microfone e que a qualidade do áudio do jogo é aceitável sem processamento de voz
+- [x] 1.3 Registrar um atalho global e verificar se ele é recebido com um jogo em fullscreen exclusivo em foco
+- [x] 1.4 Registrar o resultado dos três testes em `design.md`; se 1.1 ou 1.2 falharem, interromper e revisar a abordagem antes de prosseguir
 
 ## 2. Fundação do monorepo
 
@@ -38,7 +38,7 @@
 
 - [x] 5.1 Definir a interface `CaptureProvider`: listar fontes, iniciar captura com ou sem áudio do sistema, declarar capacidades disponíveis
 - [x] 5.2 Definir a interface `HotkeyProvider`: registrar, liberar e reportar conflito
-- [ ] 5.3 Implementar as versões Windows de ambas, conforme validado no spike
+- [x] 5.3 Implementar as versões Windows de ambas, conforme validado no spike
 - [x] 5.4 Implementar os stubs de desenvolvimento que declaram indisponibilidade explícita, sem simular sucesso
 - [x] 5.5 Resolver a implementação em um único ponto na inicialização, conforme a plataforma
 

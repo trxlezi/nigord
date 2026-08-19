@@ -21,14 +21,19 @@
 //   ss erro
 //   EOF
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 
+// Windows has no xvfb: the app launches onto the real desktop. Everything else
+// — CDP over fetch/WebSocket, the commands, the screenshots — is identical.
+const WINDOWS = process.platform === 'win32';
+
 const APP_DIR = resolve(import.meta.dirname, '../../..');
 const REPO_ROOT = resolve(APP_DIR, '../..');
-const SHOT_DIR = process.env.SCREENSHOT_DIR || '/tmp/nigord-shots';
+const SHOT_DIR = process.env.SCREENSHOT_DIR || join(tmpdir(), 'nigord-shots');
 
 // The binary lives in pnpm's store, not in a hoisted node_modules/electron, and
 // the directory carries the RESOLVED version — which is not the range in
@@ -43,9 +48,10 @@ const ELECTRON_DIRS = (() => {
     .map((entry) => join(store, entry, 'node_modules/electron'));
 })();
 
+const ELECTRON_EXE = WINDOWS ? 'dist/electron.exe' : 'dist/electron';
 const ELECTRON_PKG =
-  ELECTRON_DIRS.find((dir) => existsSync(join(dir, 'dist/electron'))) ?? ELECTRON_DIRS[0];
-const ELECTRON_BIN = ELECTRON_PKG ? join(ELECTRON_PKG, 'dist/electron') : null;
+  ELECTRON_DIRS.find((dir) => existsSync(join(dir, ELECTRON_EXE))) ?? ELECTRON_DIRS[0];
+const ELECTRON_BIN = ELECTRON_PKG ? join(ELECTRON_PKG, ELECTRON_EXE) : null;
 
 // A random port per run: a previous app that outlived its wrapper would
 // otherwise hold the fixed one and the launch would look like a hang.
@@ -82,27 +88,33 @@ function assertPrerequisites() {
 let child = null;
 
 function launchApp() {
-  // Detached so the whole process group can be killed later: killing xvfb-run
+  // Detached so the whole process tree can be killed later: killing xvfb-run
   // leaves the Electron processes running, and a survivor makes the next launch
   // exit instantly through the single-instance lock.
-  child = spawn(
-    'xvfb-run',
-    [
-      '-a',
-      '--server-args=-screen 0 1400x900x24',
-      ELECTRON_BIN,
-      APP_DIR,
-      '--no-sandbox',
-      `--remote-debugging-port=${PORT}`,
-      // Xvfb has no audio or video devices at all. Without a fake one, getUserMedia
-      // fails and anything that depends on a live microphone cannot be exercised.
-      ...(process.env['FAKE_MEDIA']
-        ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']
-        : []),
-      ...(process.env['ELECTRON_EXTRA_ARGS'] ?? '').split(' ').filter(Boolean),
-    ],
-    { cwd: REPO_ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'] },
-  );
+  const appArgs = [
+    APP_DIR,
+    '--no-sandbox',
+    `--remote-debugging-port=${PORT}`,
+    // Xvfb has no audio or video devices at all. Without a fake one, getUserMedia
+    // fails and anything that depends on a live microphone cannot be exercised.
+    // On Windows the real devices are there, so this stays opt-in.
+    ...(process.env['FAKE_MEDIA']
+      ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']
+      : []),
+    ...(process.env['ELECTRON_EXTRA_ARGS'] ?? '').split(' ').filter(Boolean),
+  ];
+
+  child = WINDOWS
+    ? spawn(ELECTRON_BIN, appArgs, {
+        cwd: REPO_ROOT,
+        detached: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+    : spawn('xvfb-run', ['-a', '--server-args=-screen 0 1400x900x24', ELECTRON_BIN, ...appArgs], {
+        cwd: REPO_ROOT,
+        detached: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
 
   const output = [];
   child.stdout.on('data', (d) => output.push(String(d)));
@@ -113,7 +125,10 @@ function launchApp() {
 function stopApp() {
   if (!child) return;
   try {
-    process.kill(-child.pid, 'SIGKILL');
+    // Windows has no process groups to signal; taskkill /T takes the tree.
+    if (WINDOWS)
+      spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    else process.kill(-child.pid, 'SIGKILL');
   } catch {
     // Already gone.
   }
