@@ -298,9 +298,20 @@ export class LiveKitRoomClient implements RoomClient {
    * elements, so without this call every volume control was inert.
    */
   private playRemoteAudio(track: RemoteAudioTrack): void {
+    // attach() sem argumento cria SEMPRE um elemento novo. Uma segunda
+    // assinatura da mesma faixa — o que uma reconexão produz — deixaria dois
+    // elementos tocando o mesmo áudio, ou seja, a pessoa dobrada de volume e
+    // levemente fora de fase. Anexar é idempotente aqui de propósito.
+    if (track.attachedElements.length > 0) return;
+
     const element = track.attach();
     element.dataset['nigordAudio'] = 'remote';
     this.audioContainer().append(element);
+  }
+
+  /** Empties the container, for when a whole session ends at once. */
+  private clearRemoteAudio(): void {
+    document.getElementById(AUDIO_CONTAINER_ID)?.replaceChildren();
   }
 
   /**
@@ -403,6 +414,10 @@ export class LiveKitRoomClient implements RoomClient {
         this.emitter.emit('connected', { identity: this.room.localParticipant.identity });
       })
       .on(RoomEvent.Disconnected, (reason) => {
+        // Sair da sala não emite TrackUnsubscribed para cada faixa, então sem
+        // isto os elementos da sessão anterior sobrevivem e a próxima entrada
+        // começa com áudio velho pendurado no documento.
+        this.clearRemoteAudio();
         this.emitter.emit('disconnected', { reason: translateDisconnect(reason) });
       })
       .on(RoomEvent.Reconnecting, () => this.emitter.emit('reconnecting', {}))

@@ -519,6 +519,17 @@ describe('reprodução de áudio', () => {
     expect(session.view.audioPlayback).toBe(true);
   });
 
+  it('esquece o bloqueio ao sair da sala', async () => {
+    // O aviso pertence à sessão que o sofreu; na tela de entrada ele ofereceria
+    // destravar um áudio que não existe mais.
+    await session.join(credentials);
+    client.blockAudioPlayback();
+
+    await session.leave();
+
+    expect(session.view.audioPlayback).toBe(true);
+  });
+
   it('mantém o aviso quando a autorização não é aceita', async () => {
     // Registrar sucesso que não houve esconderia o aviso e deixaria o
     // participante em silêncio sem nada mais para acionar.

@@ -370,6 +370,10 @@ export class Session {
       // Clearing this only on an explicit leave let a dropped connection carry
       // one room's messages into the next one.
       this.chat = [];
+      // Um bloqueio de reprodução pertence à sessão que o sofreu: mantê-lo
+      // deixaria o aviso na tela de entrada, oferecendo destravar um áudio que
+      // não existe mais.
+      this.audioPlayback = true;
       this.apply({ type: 'DISCONNECT', reason });
     });
 
