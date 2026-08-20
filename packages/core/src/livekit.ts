@@ -6,9 +6,7 @@ import {
   Room,
   RoomEvent,
   Track,
-  type RemoteAudioTrack,
   type RemoteParticipant,
-  type RemoteTrackPublication,
   createLocalAudioTrack,
 } from 'livekit-client';
 import type {
@@ -17,6 +15,8 @@ import type {
   RoomClientEvents,
   ScreenPublishOptions,
 } from './client.js';
+import { PlaybackBus } from './audio/playbackBus.js';
+import { cleanSystemAudio } from './audio/systemAudioCleaner.js';
 import { Emitter } from './events.js';
 import {
   SYSTEM_AUDIO_MAX_BITRATE_BPS,
@@ -43,9 +43,6 @@ import {
 const SYSTEM_AUDIO_TRACK_NAME = 'nigord-system-audio';
 const SCREEN_TRACK_NAME = 'nigord-screen';
 
-/** Holds the audio elements this adapter creates. See playRemoteAudio. */
-const AUDIO_CONTAINER_ID = 'nigord-audio';
-
 /**
  * Chat travels on the room's data channel as a tagged JSON envelope.
  *
@@ -63,6 +60,9 @@ export class LiveKitRoomClient implements RoomClient {
   private screenTrack: LocalVideoTrack | null = null;
   private systemAudioTrack: LocalAudioTrack | null = null;
   private readonly shareKinds = new Map<string, ContentKind>();
+  /** O que este cliente reproduz, para poder ser subtraído do loopback. */
+  private readonly playback = new PlaybackBus();
+  private stopCleaning: (() => void) | null = null;
 
   constructor() {
     this.room = new Room({
@@ -181,9 +181,36 @@ export class LiveKitRoomClient implements RoomClient {
     this.reportScreenEncodings();
 
     if (systemAudioTrack) {
+      // O loopback captura a mistura inteira da saída de áudio — inclusive as
+      // vozes que este aplicativo está reproduzindo. Sem isto, cada
+      // participante escuta a si mesmo de volta.
+      // Qualquer falha aqui degrada para publicar o áudio como veio. O eco
+      // incomoda; um compartilhamento que não acontece por causa do tratamento
+      // do áudio é muito pior (design D4).
+      let limpeza: Awaited<ReturnType<typeof cleanSystemAudio>>;
+      try {
+        limpeza = await cleanSystemAudio(this.playback, systemAudioTrack);
+      } catch (erro) {
+        console.warn('nigord: subtração de eco falhou, publicando o áudio como veio —', erro);
+        limpeza = { track: systemAudioTrack, delayMs: null, reason: 'erro', stop: () => undefined };
+      }
+      this.stopCleaning = limpeza.stop;
+      // Diagnóstico: as duas faixas lado a lado, para que uma medição externa
+      // possa comparar o que foi capturado com o que está sendo publicado. Foi
+      // assim que este defeito acabou sendo entendido.
+      (globalThis as unknown as { __nigordEco?: unknown }).__nigordEco = () => ({
+        atrasoMs: limpeza.delayMs,
+        motivo: limpeza.reason,
+        bruta: new MediaStream([systemAudioTrack]),
+        limpa: new MediaStream([limpeza.track]),
+      });
+      if (limpeza.reason) {
+        console.warn('nigord: áudio do sistema publicado sem subtração —', limpeza.reason);
+      }
+
       // Published as its own track so viewers can lower the game without
       // lowering the voice (design.md D3).
-      this.systemAudioTrack = new LocalAudioTrack(systemAudioTrack, undefined, false);
+      this.systemAudioTrack = new LocalAudioTrack(limpeza.track, undefined, false);
       await this.publish(this.systemAudioTrack, {
         source: Track.Source.ScreenShareAudio,
         name: SYSTEM_AUDIO_TRACK_NAME,
@@ -266,6 +293,8 @@ export class LiveKitRoomClient implements RoomClient {
   }
 
   async unpublishScreen(): Promise<void> {
+    this.stopCleaning?.();
+    this.stopCleaning = null;
     for (const track of [this.screenTrack, this.systemAudioTrack]) {
       if (!track) continue;
       await this.unpublish(track);
@@ -312,40 +341,12 @@ export class LiveKitRoomClient implements RoomClient {
    * This is also what makes setVolume meaningful: it acts on the attached
    * elements, so without this call every volume control was inert.
    */
-  private playRemoteAudio(track: RemoteAudioTrack): void {
-    // attach() sem argumento cria SEMPRE um elemento novo. Uma segunda
-    // assinatura da mesma faixa — o que uma reconexão produz — deixaria dois
-    // elementos tocando o mesmo áudio, ou seja, a pessoa dobrada de volume e
-    // levemente fora de fase. Anexar é idempotente aqui de propósito.
-    if (track.attachedElements.length > 0) return;
-
-    const element = track.attach();
-    element.dataset['nigordAudio'] = 'remote';
-    this.audioContainer().append(element);
-  }
-
-  /** Empties the container, for when a whole session ends at once. */
-  private clearRemoteAudio(): void {
-    document.getElementById(AUDIO_CONTAINER_ID)?.replaceChildren();
-  }
-
-  /**
-   * Where the audio elements live. Hidden, but present: `display: none` would
-   * be enough for layout and is deliberately avoided, since some browsers treat
-   * hidden media as a reason to throttle it.
-   */
-  private audioContainer(): HTMLElement {
-    const existing = document.getElementById(AUDIO_CONTAINER_ID);
-    if (existing) return existing;
-
-    const container = document.createElement('div');
-    container.id = AUDIO_CONTAINER_ID;
-    container.style.position = 'absolute';
-    container.style.width = '0';
-    container.style.height = '0';
-    container.style.overflow = 'hidden';
-    document.body.append(container);
-    return container;
+  private playRemoteAudio(chave: string, track: { mediaStreamTrack: MediaStreamTrack }): void {
+    this.playback.play(chave, track.mediaStreamTrack);
+    // Diagnóstico legível de fora, para que um roteiro possa afirmar que há som
+    // saindo em vez de contar elementos que não existem mais.
+    (globalThis as unknown as { __nigordAudio?: unknown }).__nigordAudio = () =>
+      this.playback.snapshot();
   }
 
   /**
@@ -356,38 +357,25 @@ export class LiveKitRoomClient implements RoomClient {
    * is heard. The session surfaces this so the participant can act on it.
    */
   canPlayAudio(): boolean {
-    return this.room.canPlaybackAudio;
+    // Duas condições, porque há dois jeitos de o sistema recusar: o SDK tem a
+    // sua, e o contexto de áudio — que agora é quem toca — tem a dele.
+    return this.room.canPlaybackAudio && this.playback.running;
   }
 
   /** Asks the platform to start playback, after a participant's gesture. */
   async startAudioPlayback(): Promise<void> {
     await this.room.startAudio();
+    // O contexto de áudio começa suspenso pelo mesmo motivo que os elementos se
+    // recusam a tocar, e o participante já está autorizando exatamente isso.
+    await this.playback.resume();
   }
 
   setVoiceVolume(identity: string, volume: number): void {
-    this.forEachAudioTrack(identity, (track, publication) => {
-      if (publication.source === Track.Source.Microphone) track.setVolume(volume);
-    });
+    this.playback.setVolume(chaveDeAudio(identity, Track.Source.Microphone), volume);
   }
 
   setSystemAudioVolume(identity: string, volume: number): void {
-    this.forEachAudioTrack(identity, (track, publication) => {
-      if (publication.source === Track.Source.ScreenShareAudio) track.setVolume(volume);
-    });
-  }
-
-  private forEachAudioTrack(
-    identity: string,
-    apply: (track: RemoteAudioTrack, publication: RemoteTrackPublication) => void,
-  ): void {
-    const participant = this.room.remoteParticipants.get(identity);
-    if (!participant) return;
-    for (const publication of participant.trackPublications.values()) {
-      const track = publication.track;
-      if (track && track.kind === Track.Kind.Audio) {
-        apply(track as RemoteAudioTrack, publication as RemoteTrackPublication);
-      }
-    }
+    this.playback.setVolume(chaveDeAudio(identity, Track.Source.ScreenShareAudio), volume);
   }
 
   async setOutputDevice(deviceId: string): Promise<void> {
@@ -429,10 +417,9 @@ export class LiveKitRoomClient implements RoomClient {
         this.emitter.emit('connected', { identity: this.room.localParticipant.identity });
       })
       .on(RoomEvent.Disconnected, (reason) => {
-        // Sair da sala não emite TrackUnsubscribed para cada faixa, então sem
-        // isto os elementos da sessão anterior sobrevivem e a próxima entrada
-        // começa com áudio velho pendurado no documento.
-        this.clearRemoteAudio();
+        // Sair da sala não emite TrackUnsubscribed por faixa, então sem isto a
+        // reprodução da sessão anterior sobrevive à saída.
+        this.playback.stopAll();
         this.emitter.emit('disconnected', { reason: translateDisconnect(reason) });
       })
       .on(RoomEvent.Reconnecting, () => this.emitter.emit('reconnecting', {}))
@@ -472,16 +459,15 @@ export class LiveKitRoomClient implements RoomClient {
         });
       })
       .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-        if (track.kind === Track.Kind.Audio) this.playRemoteAudio(track as RemoteAudioTrack);
+        if (track.kind === Track.Kind.Audio) {
+          this.playRemoteAudio(chaveDeAudio(participant.identity, publication.source), track);
+        }
         if (publication.source !== Track.Source.ScreenShare) return;
         this.emitter.emit('shareStreamReady', { identity: participant.identity });
       })
-      .on(RoomEvent.TrackUnsubscribed, (track) => {
-        // detach() returns the elements it removed the stream from; they are
-        // ours, so they are removed from the document too. Otherwise a
-        // departed participant leaves a silent element behind on every join.
+      .on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
         if (track.kind !== Track.Kind.Audio) return;
-        for (const element of track.detach()) element.remove();
+        this.playback.stop(chaveDeAudio(participant.identity, publication.source));
       })
       .on(RoomEvent.AudioPlaybackStatusChanged, () => {
         this.emitter.emit('audioPlaybackChanged', { allowed: this.room.canPlaybackAudio });
@@ -539,4 +525,14 @@ function translateDisconnect(reason: unknown): DisconnectReason {
     default:
       return reason === undefined ? 'user_left' : 'unknown';
   }
+}
+
+/**
+ * Identifica uma faixa de áudio remota na reprodução.
+ *
+ * Identidade e fonte juntas, porque a mesma pessoa publica voz e áudio do
+ * sistema — e os volumes das duas são controlados em separado.
+ */
+function chaveDeAudio(identity: string, source: Track.Source): string {
+  return `${identity}::${source}`;
 }

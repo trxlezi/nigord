@@ -234,15 +234,14 @@ try {
    * Os elementos ficam num contêiner conhecido justamente para poderem ser
    * medidos: `readyState > 0` e `!paused` separam "existe" de "está tocando".
    */
+  /**
+   * A reprodução deixou de ser por elemento e passou a ser um grafo de áudio,
+   * então o observável mudou junto: quantas faixas remotas estão tocando e em
+   * que estado está o contexto. Contar elementos aqui daria zero para uma sala
+   * perfeitamente audível.
+   */
   const audio = (who) =>
-    who.evaluate(`
-      (() => {
-        const els = [...document.querySelectorAll('#nigord-audio audio')];
-        return {
-          elementos: els.length,
-          tocando: els.filter((a) => !a.paused && a.readyState > 0).length,
-        };
-      })()`);
+    who.evaluate(`JSON.stringify(window.__nigordAudio ? window.__nigordAudio() : null)`);
 
   const results = [];
   const check = (name, passed, detail) => {
@@ -255,16 +254,16 @@ try {
   check('B vê A, que entrou antes', String(rosterB).includes('trxlezi'), JSON.stringify(rosterB));
 
   console.log('\n[voz] o áudio remoto realmente toca');
-  const audioB = await audio(b);
+  const audioB = JSON.parse(String(await audio(b)) || 'null');
   check(
     'B está reproduzindo a voz de A',
-    typeof audioB === 'object' && audioB.tocando > 0,
+    Boolean(audioB) && audioB.fontes > 0 && audioB.estado === 'running',
     JSON.stringify(audioB),
   );
-  const audioA = await audio(a);
+  const audioA = JSON.parse(String(await audio(a)) || 'null');
   check(
     'A está reproduzindo a voz de B',
-    typeof audioA === 'object' && audioA.tocando > 0,
+    Boolean(audioA) && audioA.fontes > 0 && audioA.estado === 'running',
     JSON.stringify(audioA),
   );
 

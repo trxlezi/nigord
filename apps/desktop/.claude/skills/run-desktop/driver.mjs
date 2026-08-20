@@ -164,6 +164,23 @@ async function connect(output) {
     if (message.id && pending.has(message.id)) {
       pending.get(message.id)(message);
       pending.delete(message.id);
+      return;
+    }
+    // Avisos e erros do renderer, que de outra forma somem: sem isto, uma
+    // exceção engolida por um catch de degradação vira um sintoma sem causa —
+    // exatamente o que custou uma sessão inteira de diagnóstico.
+    if (message.method === 'Runtime.consoleAPICalled') {
+      const { type, args = [] } = message.params;
+      if (type !== 'warning' && type !== 'error') return;
+      const texto = args
+        .map((a) => a.value ?? a.description ?? a.unserializableValue ?? '')
+        .join(' ')
+        .slice(0, 300);
+      if (texto.trim()) log(`  [console.${type}] ${texto}`);
+    }
+    if (message.method === 'Runtime.exceptionThrown') {
+      const detalhes = message.params.exceptionDetails;
+      log(`  [exceção] ${detalhes.exception?.description ?? detalhes.text}`.slice(0, 400));
     }
   });
   await new Promise((r) => ws.addEventListener('open', r));
@@ -174,6 +191,8 @@ async function connect(output) {
       pending.set(n, res);
       ws.send(JSON.stringify({ id: n, method, params }));
     });
+
+  await send('Runtime.enable');
 
   // The page target exists as soon as the window does, which is well before
   // React has mounted anything. Without this wait the first command runs against

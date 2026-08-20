@@ -113,6 +113,16 @@ segundo plano e oferece reiniciar. Se a verificação falhar, ele abre normalmen
 Para entrar em uma sala você precisa do **segredo do grupo** — quem cuida do
 servidor te passa. Sem ele o aplicativo abre, mas nenhuma sala aceita a entrada.
 
+## Problemas conhecidos
+
+**O ponteiro do mouse aparece na transmissão.** Não há como desligá-lo: a
+restrição `cursor: 'never'` é ignorada na captura, e a faixa nem declara essa
+capacidade. É limitação do Electron, aberta desde 2016
+([#7584](https://github.com/electron/electron/issues/7584),
+[#14337](https://github.com/electron/electron/issues/14337),
+[#23923](https://github.com/electron/electron/issues/23923)). Sair dela exige
+trocar o capturador por um módulo nativo.
+
 ## Reportar problemas
 
 Abra uma issue em [Issues](../../issues). O que ajuda a resolver rápido:
