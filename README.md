@@ -39,7 +39,7 @@ o uso prático sem nada disso.
                 └───────┬────────┘
                         │ token JWT
               ┌─────────▼──────────┐
-              │  token-server      │  Fastify, rota única
+              │  token-server      │  Worker, rota única
               └────────────────────┘
 ```
 
@@ -57,7 +57,7 @@ nigord/
 │   │   │   └── ipc/         contrato tipado main ↔ renderer
 │   │   ├── preload/         superfície exposta, mínima e declarada
 │   │   └── renderer/        React — agnóstico de SO
-│   └── token-server/        Fastify
+│   └── token-server/        Cloudflare Worker
 └── packages/
     ├── core/                lógica de sala e estado, sem Electron
     ├── shared/              tipos e schemas Zod compartilhados
@@ -110,8 +110,16 @@ A instalação é por usuário, não exige administrador, e você escolhe a past
 atualizações seguintes são automáticas: o aplicativo verifica ao abrir, baixa em
 segundo plano e oferece reiniciar. Se a verificação falhar, ele abre normalmente.
 
-Para entrar em uma sala você precisa do **segredo do grupo** — quem cuida do
-servidor te passa. Sem ele o aplicativo abre, mas nenhuma sala aceita a entrada.
+O instalador publicado já sai apontado para o servidor do grupo: não há tela de
+configuração, e a primeira coisa que o aplicativo pede é o seu nome e a sala.
+O endereço e o segredo do grupo entram no binário no momento do build, a partir
+dos secrets `NIGORD_TOKEN_SERVER` e `NIGORD_GROUP_SECRET` do repositório.
+
+A consequência é explícita: quem tem o instalador entra. O segredo continua
+sendo o que separa o grupo do resto da internet — o servidor recusa quem não o
+apresenta —, mas deixou de ser um segredo por pessoa. Para um grupo fechado de
+seis amigos isso é o combinado; trocar o segredo significa publicar uma versão
+nova.
 
 ## Problemas conhecidos
 
@@ -144,9 +152,17 @@ seção acima.
 pnpm install
 pnpm check         # lint + typecheck + testes
 pnpm test:watch
-pnpm dev:server    # token server (precisa de .env — veja .env.example)
+pnpm dev:server    # token server no workerd (precisa de .dev.vars — veja DEPLOY.md)
 pnpm dev:desktop   # aplicativo Electron, com recarga
 ```
+
+Em desenvolvimento o ambiente supre o que o build de release embute: defina
+`NIGORD_TOKEN_SERVER` e `NIGORD_GROUP_SECRET` antes de `pnpm dev:desktop`, ou o
+aplicativo abre e recusa a entrada dizendo que saiu sem servidor.
+
+O token server é um Cloudflare Worker — sem estado, sem banco, sem disco. Como
+implantá-lo, e por que Workers e não um container, está em
+[`DEPLOY.md`](apps/token-server/DEPLOY.md).
 
 O `packages/core` roda em qualquer sistema — a lógica de sessão é testada sem
 abrir uma janela Electron. Uma regra de lint impede que `core`, `shared` e `ui`

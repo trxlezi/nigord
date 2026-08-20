@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nigord-token",
+  "main": "src/worker.ts",
+
+  // Datas a partir de 2026-08-04 já habilitam nodejs_compat por padrão, mas a
+  // flag fica explícita: `node:crypto` (timingSafeEqual) e `node:buffer` são
+  // requisitos deste serviço, não um detalhe herdado da data.
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "observability": {
+    "enabled": true,
+  },
+
+  // Não é credencial: é o endereço público do projeto LiveKit. Deixá-lo aqui
+  // torna a implantação auto-descritiva. As três chaves de verdade
+  // (LIVEKIT_API_KEY, LIVEKIT_API_SECRET, NIGORD_GROUP_SECRET) são secrets,
+  // definidas com `wrangler secret put` e ausentes do repositório.
+  "vars": {
+    "LIVEKIT_URL": "wss://nigord-v060lwzl.livekit.cloud",
+  },
+
+  // 20 por minuto por endereço, contados pelo CF-Connecting-IP que o próprio
+  // edge escreve. `period` só aceita 10 ou 60, e o valor aqui precisa bater com
+  // RATE_LIMIT_WINDOW_SECONDS em app.ts — é ele que vira o retryAfter da
+  // resposta 429, já que o binding não informa quanto falta.
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 20,
+        "period": 60,
+      },
+    },
+  ],
+}

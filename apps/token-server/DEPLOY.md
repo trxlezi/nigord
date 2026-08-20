@@ -2,12 +2,33 @@
 
 O aplicativo não funciona sem este serviço: ele é quem guarda as chaves do
 LiveKit e emite as credenciais de sala. Nenhum participante precisa dele
-instalado — só precisa do endereço e do segredo do grupo.
+instalado — o endereço e o segredo do grupo entram no instalador no momento do
+build (veja a seção 5).
 
-> **Verificado em 19/08/2026.** O serviço está no ar em
-> `https://nigord-token.fly.dev`, implantado do Windows com `flyctl` v0.4.84 e o
-> builder remoto do Fly — não é preciso Docker na máquina. As três conferências
-> da seção 4 passaram.
+> **Histórico.** Este serviço rodou no Fly.io até agosto de 2026, quando o
+> trial da conta terminou e o app foi suspenso — o Fly não tem mais camada
+> gratuita. A migração para Cloudflare Workers foi por causa disso. O
+> `fly.toml` e o `Dockerfile` foram removidos junto.
+
+## Por que Workers
+
+O serviço é uma rota que assina um JWT. Não tem estado, não tem banco, não tem
+disco — o que o torna adequado a um runtime sem servidor de verdade, e não só
+tolerável nele.
+
+Duas propriedades decidiram a escolha:
+
+- **Sem cold start.** Este endpoint é a primeira coisa que roda quando alguém
+  clica "Entrar". Camadas gratuitas que hibernam (Render, por exemplo) levam
+  dezenas de segundos para acordar, e o app pareceria travado exatamente no
+  momento em que a pessoa está olhando para ele. Isolates do Workers sobem em
+  milissegundos.
+- **Gratuito sem cartão**, com 100 mil requisições por dia. Seis amigos fazem
+  algumas dezenas.
+
+O que **não** roda em Workers é o `@livekit/rtc-node`, que traz um binário
+nativo. O Nigord não o usa: o `livekit-server-sdk` que assina os tokens é JS
+puro.
 
 ## 1. Chaves do LiveKit
 
@@ -17,8 +38,11 @@ Crie um projeto no [LiveKit Cloud](https://cloud.livekit.io) e anote:
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
 
-Essas três **nunca** saem do servidor. Não vão para o `.exe`, não vão para o
-repositório (specs/room-access, "Proteção das chaves do serviço de mídia").
+As duas últimas **nunca** saem do servidor. Não vão para o `.exe`, não vão para
+o repositório (specs/room-access, "Proteção das chaves do serviço de mídia").
+
+`LIVEKIT_URL` não é credencial — é o endereço público do projeto — e por isso
+fica em texto claro no `wrangler.jsonc`. **Edite-o lá** antes de implantar.
 
 ## 2. Segredo do grupo
 
@@ -29,115 +53,131 @@ qualquer coisa com pelo menos 8 caracteres serve, mas não escolha à mão:
 openssl rand -base64 24
 ```
 
-Esse valor você passa para cada amigo, e cada um cola na tela de configuração
-do app. Quem tem o segredo consegue entrar em qualquer sala; trocar é só
-atualizar o servidor e avisar o grupo.
+Esse valor vai para dois lugares, e precisa ser o mesmo nos dois: um secret do
+Worker (seção 3) e um secret do repositório no GitHub (seção 5).
 
-## 3. Deploy no Fly.io
+## 3. Implantar
 
-Do **diretório raiz do repositório**:
+Do diretório `apps/token-server`:
 
 ```bash
-fly auth login
-fly apps create nigord-token --org personal
+pnpm exec wrangler login
 ```
 
-`fly launch` também serve, mas é interativo e propõe reescrever o `fly.toml`
-que já está pronto aqui. `fly apps create` faz só o que falta. Se o nome já
-estiver tomado por outra conta, escolha outro e ajuste `app` no `fly.toml`.
-
-Depois configure os segredos (eles ficam no Fly, nunca no repositório):
+Configure os três secrets. Cada comando pede o valor pelo terminal, para que
+ele não fique no histórico do shell:
 
 ```bash
-fly secrets set \
-  LIVEKIT_URL="wss://seu-projeto.livekit.cloud" \
-  LIVEKIT_API_KEY="..." \
-  LIVEKIT_API_SECRET="..." \
-  NIGORD_GROUP_SECRET="..." \
-  --config apps/token-server/fly.toml
+pnpm exec wrangler secret put LIVEKIT_API_KEY
+```
+
+```bash
+pnpm exec wrangler secret put LIVEKIT_API_SECRET
+```
+
+```bash
+pnpm exec wrangler secret put NIGORD_GROUP_SECRET
 ```
 
 E implante:
 
 ```bash
-fly deploy --config apps/token-server/fly.toml --dockerfile apps/token-server/Dockerfile --remote-only
+pnpm exec wrangler deploy
 ```
 
-`--remote-only` constrói a imagem no builder do Fly. É o que dispensa Docker na
-máquina — e no Windows é o caminho normal, não um contorno.
+O Wrangler imprime o endereço, algo como
+`https://nigord-token.<sua-conta>.workers.dev`.
 
-O Fly cria **duas** máquinas por padrão, para alta disponibilidade. Seis amigos
-não precisam disso, e é franquia gasta à toa:
+Para conferir o que vai subir sem subir nada:
 
 ```bash
-fly scale count 1 --app nigord-token
+pnpm exec wrangler deploy --dry-run
 ```
 
 ## 4. Conferir
 
 ```bash
-curl https://<seu-app>.fly.dev/health
+curl https://<seu-worker>.workers.dev/health
 # {"ok":true}
 ```
 
 E que ele recusa quem não tem o segredo:
 
 ```bash
-curl -s -X POST https://<seu-app>.fly.dev/token \
+curl -s -X POST https://<seu-worker>.workers.dev/token \
   -H 'content-type: application/json' \
   -d '{"room":"sala-principal","identity":"teste"}'
 # {"code":"unauthorized","message":"Invalid or missing group secret."}
 ```
 
-Se as duas respostas vierem assim, o serviço está pronto. O endereço
-(`https://<seu-app>.fly.dev`) e o segredo do grupo são o que cada participante
-digita na primeira execução do app.
+Se as duas respostas vierem assim, o serviço está pronto.
+
+## 5. Apontar o aplicativo
+
+Não há mais tela de configuração no app. O endereço e o segredo entram no
+instalador durante o build, a partir de dois secrets do repositório no GitHub —
+**Settings → Secrets and variables → Actions**:
+
+| Secret                | Valor                              |
+| --------------------- | ---------------------------------- |
+| `NIGORD_TOKEN_SERVER` | `https://<seu-worker>.workers.dev` |
+| `NIGORD_GROUP_SECRET` | o mesmo valor definido no Worker   |
+
+Sem eles o instalador sai vazio e recusa a entrada dizendo que saiu sem
+servidor — e não há tela para corrigir depois. Trocar o segredo passa a exigir
+publicar uma versão nova.
+
+## Desenvolvimento
+
+`wrangler dev` roda o Worker no mesmo runtime da produção (workerd), localmente:
+
+```bash
+pnpm dev:server
+```
+
+Ele lê os secrets de um arquivo `.dev.vars` em `apps/token-server`, que o
+`.gitignore` da raiz cobre explicitamente — o padrão `.env.*` não o pegaria,
+porque o nome não começa com `.env`.
+
+```
+LIVEKIT_API_KEY="..."
+LIVEKIT_API_SECRET="..."
+NIGORD_GROUP_SECRET="..."
+```
+
+O limite de taxa não é aplicado em `wrangler dev` — o binding local sempre
+responde `success`. Para exercitar o comportamento limitado, os testes usam um
+substituto: veja `fakeRateLimiter` em `src/app.test.ts`.
+
+## Limite de taxa
+
+20 requisições por minuto por endereço, configurado em `wrangler.jsonc`.
+
+O `TRUST_PROXY` que existia na versão Fly **desapareceu**, e não por descuido:
+lá, todas as requisições chegavam pelo roteador da plataforma, então sem
+configurar a contagem de saltos o limite virava um orçamento único do grupo
+inteiro — uma queda de rede que fizesse todo mundo reconectar junto derrubaria
+o resto. No Workers a contagem usa o `CF-Connecting-IP`, que o próprio edge
+escreve por cima do que o chamador mandou. Cada participante tem o seu
+orçamento por construção, e o cabeçalho não é forjável.
+
+O binding responde apenas `success`, nunca quanto falta para liberar. Por isso
+o `retryAfter` da resposta 429 é a janela inteira (60s), que é o limite
+superior honesto. Se você mudar o `period` no `wrangler.jsonc`, mude
+`RATE_LIMIT_WINDOW_SECONDS` em `src/app.ts` junto — ele só aceita 10 ou 60.
 
 ## Se falhar
 
-O que de fato quebrou no primeiro deploy foi o **contexto de build**, não o
-`pnpm install`: sem `.dockerignore` na raiz, o Docker tenta empacotar o
-`node_modules` inteiro, e a árvore de links do pnpm no Windows não cabe num tar
-(`archive/tar: unknown file mode ?rwxr-xr-x`). O `.dockerignore` da raiz existe
-por causa disso — se alguém o remover, o deploy volta a falhar exatamente
-assim.
-
-O outro ponto provável é o `pnpm install` dentro da imagem: o `Dockerfile`
-copia o manifesto do workspace, o lockfile e apenas os dois pacotes de que este
-serviço depende. Se a instalação reclamar de um pacote ausente, é porque uma
-dependência nova entrou no workspace e precisa ser copiada também.
-
-O serviço falha ao iniciar de propósito quando falta qualquer chave, com a
-mensagem dizendo qual — `fly logs` mostra exatamente essa linha.
-
-## Limite de taxa atrás de proxy
-
-O `fly.toml` já define `TRUST_PROXY=1`. Se você servir por um túnel local
-(`cloudflared`), defina o mesmo no `.env`:
-
-```
-TRUST_PROXY=1
-```
-
-Sem isso, as requisições de todos os participantes chegam do mesmo endereço e o
-limite de 20 por minuto passa a valer para o grupo inteiro somado — uma queda de
-rede que faça todo mundo reconectar ao mesmo tempo derrubaria o resto.
-
-## Alternativa sem deploy
-
-Para um teste rápido, um túnel da máquina de desenvolvimento resolve, sem
-conta de hospedagem nenhuma:
+O serviço **não pode** recusar-se a iniciar quando falta uma chave, como fazia
+no Fly: um Worker não tem boot, o isolate é criado sob demanda. A verificação
+passou para o caminho da requisição — uma configuração incompleta responde
+`server_error` em toda chamada e registra qual chave falta, e nunca assina um
+token que o LiveKit rejeitaria. Os logs saem em:
 
 ```bash
-LIVEKIT_URL="wss://seu-projeto.livekit.cloud" \
-LIVEKIT_API_KEY="..." \
-LIVEKIT_API_SECRET="..." \
-NIGORD_GROUP_SECRET="..." \
-pnpm dev:server
-
-cloudflared tunnel --url http://localhost:3000
+pnpm exec wrangler tail
 ```
 
-O endereço `https://...trycloudflare.com` que ele imprime é o que vai na tela
-de configuração do app. Só vale enquanto a máquina estiver ligada com o túnel
-aberto.
+Se o `deploy` reclamar de `nodejs_compat`, confira se a flag continua no
+`wrangler.jsonc`. `node:crypto` (`timingSafeEqual`, na comparação do segredo) e
+`node:buffer` dependem dela.
