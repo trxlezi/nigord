@@ -51,5 +51,5 @@ recupera pixels que a captura não produziu.
 #### Scenario: Fonte menor que a resolução pedida
 
 - **WHEN** a janela ou tela capturada é menor do que a resolução escolhida
-- **THEN** o sistema captura no tamanho disponível, sem falhar o
-  compartilhamento
+- **THEN** o compartilhamento começa normalmente, com o tamanho que a
+  plataforma entregar — que pode não ser o tamanho próprio da janela

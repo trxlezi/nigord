@@ -121,6 +121,22 @@ Mudança em transmissão, medida no mesmo teste: passar de 1080p/4 Mbps para
 720p/700 kbps alterou a captura para 1280×720 e chegou ao espectador em
 1280×720, sem interromper o compartilhamento.
 
+### D7 — Captura de janela não devolve o tamanho da janela
+
+Medido no Windows: compartilhando uma janela de **1100×720**, a faixa capturada
+reporta **1920×1080** com `resizeMode: "crop-and-scale"`. O mesmo acontece
+pedindo só a taxa de quadros, que era o comportamento anterior, e pedindo `max`
+em vez de `ideal` — ou seja, **não é consequência desta mudança**: é como o
+Electron entrega captura de janela nesta plataforma.
+
+A consequência prática é real: compartilhar uma janela pequena a 1080p gasta
+bitrate codificando pixels que a janela não tem. Quem compartilha tem, agora,
+como responder — baixar a resolução no próprio controle, sem parar.
+
+O cenário da spec foi corrigido para descrever o observado em vez do esperado.
+Registrar a diferença vale mais do que uma afirmação bonita e falsa: foi
+exatamente esse tipo de afirmação que sustentou uma release inteira sem som.
+
 ## Risks / Trade-offs
 
 - **Quem tem internet ruim para de ver a tela** → É a decisão, tomada de olhos
