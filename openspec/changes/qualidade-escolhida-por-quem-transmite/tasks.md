@@ -35,6 +35,6 @@
 
 ## 5. Distribuição
 
-- [ ] 5.1 Publicar a release
+- [x] 5.1 Publicar a release — v0.6.0
 - [ ] 5.2 Confirmar com o amigo que a imagem melhorou, e medir o consumo contra
       a franquia do plano gratuito (bootstrap 10.6)
