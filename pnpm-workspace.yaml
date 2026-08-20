@@ -5,3 +5,6 @@ packages:
 onlyBuiltDependencies:
   - electron
   - esbuild
+  # Runtime do Workers, usado por `wrangler dev` para rodar o token server
+  # localmente. Sem o script de instalação o binário não é baixado.
+  - workerd

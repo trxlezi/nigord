@@ -3,7 +3,7 @@ import { BrowserWindow, Menu, Tray, app, nativeImage, session, shell } from 'ele
 import { createCaptureProvider } from './capture/index.js';
 import { createHotkeyProvider } from './hotkeys/index.js';
 import { registerIpc } from './ipc/register.js';
-import { ConfigStore } from './config/store.js';
+import { groupSecret, tokenServerUrl } from './config/connection.js';
 import { PreferencesStore } from './prefs/store.js';
 import { TokenClient } from './tokenClient.js';
 import { initUpdater } from './updater/index.js';
@@ -14,7 +14,6 @@ const hotkeys = createHotkeyProvider();
 let window: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let prefs: PreferencesStore;
-let config: ConfigStore;
 let quitting = false;
 
 /**
@@ -57,7 +56,6 @@ if (!app.requestSingleInstanceLock()) {
 
 async function main(): Promise<void> {
   prefs = new PreferencesStore(app.getPath('userData'));
-  config = new ConfigStore(app.getPath('userData'));
 
   createWindow();
   createTray();
@@ -172,8 +170,8 @@ function wireDisplayMedia(): void {
 
 function wireIpc(): void {
   const tokenClient = new TokenClient(() => ({
-    baseUrl: config.tokenServerUrl,
-    groupSecret: config.groupSecret,
+    baseUrl: tokenServerUrl(),
+    groupSecret: groupSecret(),
   }));
 
   registerIpc({
@@ -206,10 +204,6 @@ function wireIpc(): void {
     },
     'prefs:get': () => prefs.get(),
     'prefs:set': (patch) => prefs.update(patch),
-    // The secret goes in and never comes back out: the response carries only
-    // whether one is stored.
-    'config:get': () => config.view,
-    'config:set': (patch) => config.update(patch),
     'token:request': (payload) => tokenClient.request(payload.room, payload.identity),
     'app:quit': () => {
       quit();

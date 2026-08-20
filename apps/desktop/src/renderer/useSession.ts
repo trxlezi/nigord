@@ -100,7 +100,11 @@ const MESSAGES: Record<TokenFailureCode, JoinFailure> = {
   },
   unconfigured: {
     kind: 'config',
-    message: 'Configure o servidor e o segredo do grupo antes de entrar.',
+    // Servidor e segredo entram no build. Se chegaram vazios, quem instalou
+    // não tem o que corrigir na própria máquina — o instalador é que está
+    // errado, e a mensagem precisa dizer isso em vez de mandar procurar uma
+    // tela de configuração que não existe mais.
+    message: 'Este instalador saiu sem o servidor do grupo. Baixe a versão publicada em Releases.',
   },
 };
 

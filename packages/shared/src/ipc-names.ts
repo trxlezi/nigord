@@ -18,8 +18,6 @@ export const ipcChannelNames = [
   'hotkey:unregister',
   'prefs:get',
   'prefs:set',
-  'config:get',
-  'config:set',
   'token:request',
   'app:quit',
   'app:version',

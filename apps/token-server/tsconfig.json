@@ -3,7 +3,10 @@
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
-    "types": ["node"]
+    // Both, and in this order: the code runs on workerd, which supplies the
+    // Request/Response/ExportedHandler globals, but reaches node:crypto and
+    // node:buffer through nodejs_compat.
+    "types": ["@cloudflare/workers-types", "node"]
   },
   "include": ["src/**/*"],
   "references": [{ "path": "../../packages/shared" }]

@@ -10,9 +10,20 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
  */
 const workspacePackages = ['@nigord/shared', '@nigord/core', '@nigord/ui'];
 
+/**
+ * Endereço e segredo do grupo entram no binário no momento do build, não numa
+ * tela de primeira execução (src/main/config/connection.ts). Ficam vazios num
+ * build de desenvolvimento: ali o ambiente supre.
+ */
+const connectionDefines = {
+  __NIGORD_TOKEN_SERVER__: JSON.stringify(process.env['NIGORD_TOKEN_SERVER'] ?? ''),
+  __NIGORD_GROUP_SECRET__: JSON.stringify(process.env['NIGORD_GROUP_SECRET'] ?? ''),
+};
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin({ exclude: workspacePackages })],
+    define: connectionDefines,
     build: {
       lib: { entry: resolve(__dirname, 'src/main/index.ts') },
     },
