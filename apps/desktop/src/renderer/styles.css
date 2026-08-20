@@ -241,6 +241,33 @@ body {
   border-bottom: 1px solid rgb(229 100 109 / 24%);
 }
 
+/* Os dials de qualidade na barra inferior, visíveis só enquanto se transmite. */
+.controls__quality {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.field__input--small {
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.picker__dials {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .alert {
   margin: 0;
   padding: 9px 11px;

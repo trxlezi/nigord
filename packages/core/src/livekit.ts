@@ -6,7 +6,6 @@ import {
   Room,
   RoomEvent,
   Track,
-  VideoPreset,
   type RemoteAudioTrack,
   type RemoteParticipant,
   type RemoteTrackPublication,
@@ -22,9 +21,11 @@ import { Emitter } from './events.js';
 import {
   SYSTEM_AUDIO_MAX_BITRATE_BPS,
   VOICE_MAX_BITRATE_BPS,
+  type ShareQuality,
+  captureConstraintsFor,
   contentHintFor,
   microphoneConstraints,
-  screenShareLayers,
+  shareEncodingFor,
 } from './media.js';
 
 /**
@@ -65,12 +66,15 @@ export class LiveKitRoomClient implements RoomClient {
 
   constructor() {
     this.room = new Room({
+      // Sem camadas para escolher, o que sobra do adaptiveStream é o que
+      // interessa: pausar o vídeo de quem não está com a aba visível.
       adaptiveStream: true,
-      // Simulcast is what lets one viewer on a weak connection drop a layer
-      // without degrading what the others receive.
       dynacast: true,
       publishDefaults: {
-        simulcast: true,
+        // A tela publica uma codificação só, escolhida por quem transmite
+        // (qualidade-escolhida-por-quem-transmite, D1). Áudio nunca usou
+        // simulcast, então isto não tira nada de ninguém.
+        simulcast: false,
         audioPreset: { maxBitrate: VOICE_MAX_BITRATE_BPS },
       },
     });
@@ -145,6 +149,7 @@ export class LiveKitRoomClient implements RoomClient {
   async publishScreen({
     stream,
     contentKind,
+    quality,
     systemAudioTrack,
   }: ScreenPublishOptions): Promise<void> {
     const [videoTrack] = stream.getVideoTracks();
@@ -155,50 +160,22 @@ export class LiveKitRoomClient implements RoomClient {
     videoTrack.contentHint = contentHintFor(contentKind);
 
     this.screenTrack = new LocalVideoTrack(videoTrack, undefined, false);
-    const [topLayer, ...lowerLayers] = screenShareLayers(contentKind);
-    const settings = videoTrack.getSettings();
-    const width = settings.width ?? 0;
-    const height = settings.height ?? 0;
 
     await this.publish(this.screenTrack, {
       source: Track.Source.ScreenShare,
       name: SCREEN_TRACK_NAME,
-      simulcast: true,
-      // Keep the pixels, spend the framerate. The encoder's default under this
-      // content hint is the opposite — it protects framerate and scales the
-      // image down — and a screen share that arrives at half resolution is
-      // unreadable in a way that a few dropped frames never is. Measured: a
-      // 1920×1080 capture reaching a 1888×1016 viewer at 960×540.
+      // Uma codificação só. Com simulcast, quem decidia o que cada espectador
+      // recebia eram o tamanho da janela dele, a estimativa de banda e o
+      // dynacast — e o medido foi 960×540 numa captura de 1920×1080, sem que
+      // quem transmitia soubesse. A decisão do projeto é que a sala inteira vê
+      // o que quem mostra escolheu, mesmo ao custo de travar para quem não
+      // aguenta.
+      simulcast: false,
+      // Sob pressão, perder quadros antes de perder pixels.
       degradationPreference: 'maintain-resolution',
-      // The lower layers were described in media.ts and never reached the SDK,
-      // which was left to invent its own. Passing them is what makes
-      // scaleDownBy mean something.
-      ...(lowerLayers.length > 0 && width > 0 && height > 0
-        ? {
-            screenShareSimulcastLayers: lowerLayers.map(
-              (layer) =>
-                new VideoPreset(
-                  Math.floor(width / layer.scaleDownBy),
-                  Math.floor(height / layer.scaleDownBy),
-                  layer.maxBitrateBps,
-                  layer.maxFramerate,
-                ),
-            ),
-          }
-        : {}),
-      // screenShareEncoding, não videoEncoding: para uma track de tela o SDK lê
-      // este campo e ignora o outro. Com o nome errado, tudo em media.ts era
-      // decorativo e o que subia eram os padrões do LiveKit — 1080p a 15
-      // quadros e 2,5 Mbps, medidos numa sessão real como "muito feio" para um
-      // jogo. O erro era invisível porque a chave existe e é válida.
-      ...(topLayer
-        ? {
-            screenShareEncoding: {
-              maxBitrate: topLayer.maxBitrateBps,
-              maxFramerate: topLayer.maxFramerate,
-            },
-          }
-        : {}),
+      // screenShareEncoding, e não videoEncoding: para uma track de tela o SDK
+      // lê este campo e ignora o outro.
+      screenShareEncoding: shareEncodingFor(quality),
     });
 
     this.reportScreenEncodings();
@@ -215,6 +192,44 @@ export class LiveKitRoomClient implements RoomClient {
         red: false,
       });
     }
+  }
+
+  /**
+   * Muda a qualidade sem interromper a transmissão (design D4).
+   *
+   * Republicar a track faria a tela piscar para todos os espectadores, e o caso
+   * de uso é justamente reagir a uma sala engasgando — o pior momento possível
+   * para derrubar a imagem. A resolução e a taxa de quadros vão para a track
+   * viva; o teto de bitrate vai para o emissor.
+   *
+   * Uma restrição recusada pela plataforma deixa a transmissão como estava:
+   * "não mudou" é um resultado melhor do que "parou".
+   */
+  async setScreenQuality(quality: ShareQuality): Promise<void> {
+    const track = this.screenTrack;
+    if (!track) return;
+
+    try {
+      await track.mediaStreamTrack.applyConstraints(captureConstraintsFor(quality));
+    } catch {
+      // A captura recusou o novo tamanho; o bitrate abaixo ainda vale a pena.
+    }
+
+    const sender = track.sender;
+    if (!sender) return;
+    const parameters = sender.getParameters();
+    const [encoding] = parameters.encodings ?? [];
+    if (!encoding) return;
+
+    const { maxBitrate, maxFramerate } = shareEncodingFor(quality);
+    encoding.maxBitrate = maxBitrate;
+    encoding.maxFramerate = maxFramerate;
+    try {
+      await sender.setParameters(parameters);
+    } catch {
+      // Idem: manter o que já estava no ar.
+    }
+    this.reportScreenEncodings();
   }
 
   /**

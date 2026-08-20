@@ -280,17 +280,20 @@ try {
   // video frozen at zero.
   check('o vídeo realmente chega em B', typeof v === 'object' && v.largura > 0, JSON.stringify(v));
 
-  // A resolução ENTREGUE depende da banda de quem assiste, e com duas
-  // instâncias no mesmo enlace ela cai legitimamente para a camada baixa —
-  // afirmar um piso aqui reprovaria a rede, não o código. O que o código
-  // controla é o que se publica, e é isso que se afirma: a camada de topo tem
-  // de existir em resolução plena. Foi a ausência dela, por um campo com o nome
-  // errado, que entregou 15 quadros por segundo durante uma release inteira.
+  // Sem simulcast existe UMA codificação, e ela é a que todos recebem — é a
+  // decisão do projeto, então é isso que se afirma. Duas ou mais camadas aqui
+  // significariam que o simulcast voltou por algum padrão do SDK, e com ele
+  // volta a escolha por espectador que esta mudança removeu.
   const camadas = await a.evaluate(`JSON.stringify(window.__nigordEncodings ?? [])`);
-  const topo = JSON.parse(String(camadas)).find((c) => c.escala === 1);
+  const publicadas = JSON.parse(String(camadas));
   check(
-    'A publica uma camada em resolução plena',
-    Boolean(topo) && topo.ativa === true,
+    'A publica uma codificação só, ativa',
+    publicadas.length === 1 && publicadas[0]?.ativa === true,
+    String(camadas),
+  );
+  check(
+    'a codificação carrega o que foi escolhido',
+    publicadas[0]?.fps === 60 && publicadas[0]?.bitrate === 4000000,
     String(camadas),
   );
   console.log('    resolução entregue a B:', JSON.stringify(v));

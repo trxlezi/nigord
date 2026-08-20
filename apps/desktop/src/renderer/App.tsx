@@ -13,7 +13,7 @@ import {
   SourcePicker,
   VolumePanel,
 } from '@nigord/ui';
-import { captureFramerateFor, systemAudioConstraints } from '@nigord/core';
+import { type ShareQuality, captureConstraintsFor, systemAudioConstraints } from '@nigord/core';
 import { bridge } from './bridge.js';
 import { useConfig } from './useConfig.js';
 import { useDevices } from './useDevices.js';
@@ -119,7 +119,12 @@ export function App(): JSX.Element {
    * then the renderer acquires the stream it authorised (design.md D2).
    */
   const startSharing = useCallback(
-    async (choice: { sourceId: string; contentKind: ContentKind; includeSystemAudio: boolean }) => {
+    async (choice: {
+      sourceId: string;
+      contentKind: ContentKind;
+      includeSystemAudio: boolean;
+      quality: ShareQuality;
+    }) => {
       setSources(null);
       try {
         const granted = await bridge.invoke('capture:start', choice);
@@ -129,7 +134,7 @@ export function App(): JSX.Element {
         // it. The encoder cannot invent frames the capture never produced, and
         // audio that arrived echo-cancelled cannot be un-cancelled.
         const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: captureFramerateFor(choice.contentKind),
+          video: captureConstraintsFor(choice.quality),
           // `audio: true` would hand back Chromium's voice defaults — echo
           // cancellation, noise suppression and AGC — which is exactly what
           // design.md D3 exists to avoid. Echo cancellation is the worst of the
@@ -153,10 +158,14 @@ export function App(): JSX.Element {
         await session.startSharing({
           stream,
           contentKind: choice.contentKind,
+          quality: choice.quality,
           systemAudioTrack: systemAudioTrack ?? null,
         });
 
         update({
+          shareResolution: choice.quality.resolution,
+          shareFramerate: choice.quality.framerate,
+          shareBitrate: choice.quality.bitrate,
           defaultContentKind: choice.contentKind,
           shareSystemAudioByDefault: choice.includeSystemAudio,
         });
@@ -290,6 +299,19 @@ export function App(): JSX.Element {
           hasMicrophone={view.hasMicrophone}
           isSharing={view.isSharing}
           canShare={capabilities?.screenCapture.available ?? false}
+          shareQuality={{
+            resolution: prefs.shareResolution,
+            framerate: prefs.shareFramerate,
+            bitrate: prefs.shareBitrate,
+          }}
+          onShareQuality={(quality) => {
+            void session.setShareQuality(quality);
+            update({
+              shareResolution: quality.resolution,
+              shareFramerate: quality.framerate,
+              shareBitrate: quality.bitrate,
+            });
+          }}
           onToggleMute={() => {
             const next = view.micMode === 'muted' ? 'open' : 'muted';
             void session.setMicMode(next);
@@ -312,6 +334,11 @@ export function App(): JSX.Element {
             sources={sources}
             systemAudio={capabilities.systemAudio}
             defaultContentKind={prefs.defaultContentKind}
+            defaultQuality={{
+              resolution: prefs.shareResolution,
+              framerate: prefs.shareFramerate,
+              bitrate: prefs.shareBitrate,
+            }}
             defaultIncludeSystemAudio={prefs.shareSystemAudioByDefault}
             onCancel={() => setSources(null)}
             onConfirm={(choice) => void startSharing(choice)}

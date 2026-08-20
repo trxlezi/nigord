@@ -1,4 +1,10 @@
 import type { MicMode } from '@nigord/shared';
+import {
+  BITRATE_OPTIONS,
+  FRAMERATE_OPTIONS,
+  RESOLUTION_OPTIONS,
+  type ShareQualityChoice,
+} from './SourcePicker.js';
 
 export interface SessionControlsProps {
   micMode: MicMode;
@@ -7,6 +13,9 @@ export interface SessionControlsProps {
   hasMicrophone: boolean;
   isSharing: boolean;
   canShare: boolean;
+  /** A qualidade em curso, editável sem parar a transmissão. */
+  shareQuality: ShareQualityChoice;
+  onShareQuality: (quality: ShareQualityChoice) => void;
   onToggleMute: () => void;
   onTogglePushToTalk: () => void;
   onShare: () => void;
@@ -27,12 +36,44 @@ export function SessionControls({
   hasMicrophone,
   isSharing,
   canShare,
+  shareQuality,
+  onShareQuality,
   onToggleMute,
   onTogglePushToTalk,
   onShare,
   onStopSharing,
   onLeave,
 }: SessionControlsProps): JSX.Element {
+  /**
+   * Aparece só enquanto se transmite, e muda a qualidade sem interromper.
+   *
+   * Este é o momento em que a escolha importa: a sala engasgou e quem mostra a
+   * tela precisa baixar a resolução agora — reabrir o seletor significaria
+   * parar de compartilhar e recomeçar, na frente de todo mundo.
+   */
+  const dial = <K extends keyof ShareQualityChoice>(
+    label: string,
+    key: K,
+    options: readonly { value: ShareQualityChoice[K]; label: string }[],
+    parse: (raw: string) => ShareQualityChoice[K],
+  ): JSX.Element => (
+    <label className="controls__dial">
+      <span className="visually-hidden">{label}</span>
+      <select
+        className="field__input field__input--small"
+        value={String(shareQuality[key])}
+        aria-label={label}
+        onChange={(event) => onShareQuality({ ...shareQuality, [key]: parse(event.target.value) })}
+      >
+        {options.map((option) => (
+          <option key={String(option.value)} value={String(option.value)}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   return (
     <div className="controls">
       <button
@@ -70,6 +111,14 @@ export function SessionControls({
       )}
 
       <span className="controls__spacer" />
+
+      {isSharing && (
+        <div className="controls__quality" role="group" aria-label="Qualidade da transmissão">
+          {dial('Resolução', 'resolution', RESOLUTION_OPTIONS, (raw) => raw as never)}
+          {dial('Quadros', 'framerate', FRAMERATE_OPTIONS, (raw) => Number(raw) as never)}
+          {dial('Bitrate', 'bitrate', BITRATE_OPTIONS, (raw) => raw as never)}
+        </div>
+      )}
 
       {isSharing ? (
         <button className="button" onClick={onStopSharing}>

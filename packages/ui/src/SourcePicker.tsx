@@ -1,18 +1,58 @@
 import { useState } from 'react';
-import type { Capability, CaptureSource, ContentKind } from '@nigord/shared';
+import type {
+  Capability,
+  CaptureSource,
+  ContentKind,
+  ShareBitrateName,
+  ShareFramerateValue,
+  ShareResolutionName,
+} from '@nigord/shared';
+
+export interface ShareQualityChoice {
+  resolution: ShareResolutionName;
+  framerate: ShareFramerateValue;
+  bitrate: ShareBitrateName;
+}
 
 export interface SourcePickerProps {
   sources: readonly CaptureSource[];
   systemAudio: Capability;
   defaultContentKind: ContentKind;
   defaultIncludeSystemAudio: boolean;
+  defaultQuality: ShareQualityChoice;
   onCancel: () => void;
   onConfirm: (choice: {
     sourceId: string;
     contentKind: ContentKind;
     includeSystemAudio: boolean;
+    quality: ShareQualityChoice;
   }) => void;
 }
+
+/**
+ * Os valores aparecem escritos porque a escolha é de quem transmite e vale para
+ * todos: "1080p a 60 quadros, até 4 Mbps" é uma frase que quem mostra a tela
+ * consegue avaliar contra a própria internet. "Alta/média/baixa" não é.
+ */
+export const RESOLUTION_OPTIONS: { value: ShareResolutionName; label: string }[] = [
+  { value: '1080p', label: '1080p' },
+  { value: '720p', label: '720p' },
+  { value: '480p', label: '480p' },
+  { value: '360p', label: '360p' },
+];
+
+export const FRAMERATE_OPTIONS: { value: ShareFramerateValue; label: string }[] = [
+  { value: 60, label: '60 fps' },
+  { value: 30, label: '30 fps' },
+  { value: 24, label: '24 fps' },
+  { value: 15, label: '15 fps' },
+];
+
+export const BITRATE_OPTIONS: { value: ShareBitrateName; label: string }[] = [
+  { value: 'high', label: 'Alto — até 4 Mbps' },
+  { value: 'medium', label: 'Médio — até 2 Mbps' },
+  { value: 'low', label: 'Baixo — até 700 kbps' },
+];
 
 /**
  * Screen/window picker with preview (task 7.4).
@@ -26,11 +66,13 @@ export function SourcePicker({
   systemAudio,
   defaultContentKind,
   defaultIncludeSystemAudio,
+  defaultQuality,
   onCancel,
   onConfirm,
 }: SourcePickerProps): JSX.Element {
   const [selected, setSelected] = useState<string | null>(null);
   const [contentKind, setContentKind] = useState<ContentKind>(defaultContentKind);
+  const [quality, setQuality] = useState<ShareQualityChoice>(defaultQuality);
   const [includeSystemAudio, setIncludeSystemAudio] = useState(
     defaultIncludeSystemAudio && systemAudio.available,
   );
@@ -73,7 +115,77 @@ export function SourcePicker({
       </div>
 
       <fieldset className="picker__options">
+        <legend className="field__label">Qualidade</legend>
+        <p className="field__hint">
+          Todos veem nesta qualidade. Quem não tiver internet para acompanhar vai ver travando.
+        </p>
+
+        <div className="picker__dials">
+          <label className="field">
+            <span className="field__label">Resolução</span>
+            <select
+              className="field__input"
+              value={quality.resolution}
+              onChange={(event) =>
+                setQuality({
+                  ...quality,
+                  resolution: event.target.value as ShareResolutionName,
+                })
+              }
+            >
+              {RESOLUTION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
+            <span className="field__label">Quadros</span>
+            <select
+              className="field__input"
+              value={quality.framerate}
+              onChange={(event) =>
+                setQuality({
+                  ...quality,
+                  framerate: Number(event.target.value) as ShareFramerateValue,
+                })
+              }
+            >
+              {FRAMERATE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
+            <span className="field__label">Bitrate</span>
+            <select
+              className="field__input"
+              value={quality.bitrate}
+              onChange={(event) =>
+                setQuality({ ...quality, bitrate: event.target.value as ShareBitrateName })
+              }
+            >
+              {BITRATE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset className="picker__options">
         <legend className="field__label">Tipo de conteúdo</legend>
+        <p className="field__hint">
+          Não é a mesma coisa que a qualidade acima: isto diz ao codificador o que a imagem é, para
+          ele saber onde gastar o bitrate que tem.
+        </p>
         <label className="radio">
           <input
             type="radio"
@@ -117,7 +229,7 @@ export function SourcePicker({
           className="button button--primary"
           disabled={!selected}
           onClick={() =>
-            selected && onConfirm({ sourceId: selected, contentKind, includeSystemAudio })
+            selected && onConfirm({ sourceId: selected, contentKind, includeSystemAudio, quality })
           }
         >
           Compartilhar

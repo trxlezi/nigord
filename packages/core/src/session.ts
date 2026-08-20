@@ -8,6 +8,7 @@ import type {
 } from '@nigord/shared';
 import { CHAT_MAX_LENGTH } from '@nigord/shared';
 import type { RoomClient, RoomClientEvents, ScreenPublishOptions } from './client.js';
+import type { ShareQuality } from './media.js';
 import { Emitter } from './events.js';
 import { type SessionSnapshot, initialSnapshot, isLive, transition } from './machine.js';
 import {
@@ -267,6 +268,17 @@ export class Session {
   }
 
   // ---- screen share --------------------------------------------------------
+
+  /**
+   * Muda a qualidade da transmissão em curso.
+   *
+   * Sem efeito quando não se está compartilhando: a escolha feita antes de
+   * começar é lida por `startSharing`, então não há nada a aplicar aqui.
+   */
+  async setShareQuality(quality: ShareQuality): Promise<void> {
+    if (!this.sharing) return;
+    await this.client.setScreenQuality(quality);
+  }
 
   async startSharing(options: ScreenPublishOptions): Promise<void> {
     if (!isLive(this.snapshot)) return;

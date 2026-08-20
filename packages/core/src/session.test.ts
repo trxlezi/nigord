@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CHAT_MAX_LENGTH } from '@nigord/shared';
+import { DEFAULT_SHARE_QUALITY } from './media.js';
 import { Session } from './session.js';
 import { FakeRoomClient } from './testing.js';
 
@@ -192,6 +193,7 @@ describe('watching your own share', () => {
     await session.startSharing({
       stream: {} as MediaStream,
       contentKind: 'motion',
+      quality: DEFAULT_SHARE_QUALITY,
       systemAudioTrack: null,
     });
 
@@ -394,6 +396,7 @@ describe('screen sharing', () => {
   const publishOptions = {
     stream: {} as MediaStream,
     contentKind: 'motion' as const,
+    quality: DEFAULT_SHARE_QUALITY,
     systemAudioTrack: {} as MediaStreamTrack,
   };
 

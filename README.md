@@ -11,7 +11,7 @@ As alternativas prontas ou degradam a qualidade da tela nos planos gratuitos, ou
 ## O que faz
 
 - **Voz sempre ligada** com cancelamento de eco, mute e push-to-talk global — reconhecido mesmo com o jogo em foco
-- **Compartilhamento de tela ou janela** em alta qualidade, com hint de conteúdo para movimento ou texto
+- **Compartilhamento de tela ou janela** com resolução, taxa de quadros e bitrate escolhidos por quem transmite — até 1080p60 —, ajustáveis sem parar a transmissão, e iguais para todos que assistem
 - **Áudio do sistema** capturado como track separada da voz, para que cada espectador controle o volume do jogo do amigo independentemente da voz dele
 - **Chat de texto da sessão** pelo canal de dados da própria sala — sem servidor extra e sem histórico: as mensagens somem quando você sai
 - **Bandeja do sistema** — fechar a janela não derruba a sessão

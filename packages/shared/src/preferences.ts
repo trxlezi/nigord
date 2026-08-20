@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { contentKindSchema, micModeSchema } from './session.js';
+import {
+  contentKindSchema,
+  micModeSchema,
+  shareBitrateSchema,
+  shareFramerateSchema,
+  shareResolutionSchema,
+} from './session.js';
 import { participantIdentitySchema, roomNameSchema } from './token.js';
 
 /**
@@ -18,6 +24,10 @@ export const preferencesSchema = z.object({
   /** Electron accelerator string, e.g. "F13" or "CommandOrControl+Shift+K". */
   pushToTalkKey: z.string().default('F13'),
   defaultContentKind: contentKindSchema.default('motion'),
+  /** Qualidade escolhida no último compartilhamento. */
+  shareResolution: shareResolutionSchema.default('1080p'),
+  shareFramerate: shareFramerateSchema.default(60),
+  shareBitrate: shareBitrateSchema.default('high'),
   shareSystemAudioByDefault: z.boolean().default(true),
   /** Per-participant voice volume, 0..1, keyed by identity. */
   voiceVolumes: z.record(z.string(), z.number().min(0).max(1)).default({}),

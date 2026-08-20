@@ -23,6 +23,26 @@ export type MicMode = z.infer<typeof micModeSchema>;
 export const contentKindSchema = z.enum(['motion', 'detail']);
 export type ContentKind = z.infer<typeof contentKindSchema>;
 
+/**
+ * A qualidade que quem transmite escolhe, e que todos os espectadores recebem.
+ *
+ * Fica em `shared` porque atravessa a fronteira das preferências, que o
+ * processo main persiste e o renderer lê.
+ */
+export const shareResolutionSchema = z.enum(['1080p', '720p', '480p', '360p']);
+export type ShareResolutionName = z.infer<typeof shareResolutionSchema>;
+
+export const shareFramerateSchema = z.union([
+  z.literal(15),
+  z.literal(24),
+  z.literal(30),
+  z.literal(60),
+]);
+export type ShareFramerateValue = z.infer<typeof shareFramerateSchema>;
+
+export const shareBitrateSchema = z.enum(['low', 'medium', 'high']);
+export type ShareBitrateName = z.infer<typeof shareBitrateSchema>;
+
 /** Why a session ended, so the UI can say something useful. */
 export const disconnectReasonSchema = z.enum([
   'user_left',

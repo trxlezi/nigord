@@ -42,47 +42,84 @@ export const systemAudioConstraints = (): MediaTrackConstraints => ({
 export const contentHintFor = (kind: ContentKind): 'motion' | 'detail' =>
   kind === 'motion' ? 'motion' : 'detail';
 
+export const SHARE_RESOLUTIONS = ['1080p', '720p', '480p', '360p'] as const;
+export type ShareResolution = (typeof SHARE_RESOLUTIONS)[number];
+
+export const SHARE_FRAMERATES = [15, 24, 30, 60] as const;
+export type ShareFramerate = (typeof SHARE_FRAMERATES)[number];
+
+export const SHARE_BITRATES = ['low', 'medium', 'high'] as const;
+export type ShareBitrate = (typeof SHARE_BITRATES)[number];
+
+export interface ShareQuality {
+  readonly resolution: ShareResolution;
+  readonly framerate: ShareFramerate;
+  readonly bitrate: ShareBitrate;
+}
+
+const RESOLUTION_DIMENSIONS: Record<ShareResolution, { width: number; height: number }> = {
+  '1080p': { width: 1920, height: 1080 },
+  '720p': { width: 1280, height: 720 },
+  '480p': { width: 854, height: 480 },
+  '360p': { width: 640, height: 360 },
+};
+
 /**
- * Framerate asked of the capture itself, per content kind.
+ * Tetos de bitrate, em bits por segundo.
  *
- * The encoder ceiling below is only a ceiling: it cannot invent frames the
- * capture never produced. getDisplayMedia without a frameRate constraint hands
- * back Chromium's default — around 30 — so the 60 configured for motion was
- * never reachable. These two have to move together, which is why they live in
- * the same file.
- *
- * 'ideal' rather than 'exact': a machine that cannot sustain 60 should give
- * what it can, not fail to capture at all.
+ * Estes números não são multiplicados por espectador: com um SFU, quem
+ * transmite sobe um fluxo só. É por isso que o projeto de referência, que é
+ * mesh, precisa ser mais conservador aqui do que este.
  */
-export const captureFramerateFor = (kind: ContentKind): MediaTrackConstraints => ({
-  frameRate: { ideal: kind === 'motion' ? 60 : 15 },
+const BITRATE_BPS: Record<ShareBitrate, number> = {
+  low: 700_000,
+  medium: 2_000_000,
+  high: 4_000_000,
+};
+
+export const shareDimensions = (resolution: ShareResolution): { width: number; height: number } =>
+  RESOLUTION_DIMENSIONS[resolution];
+
+export const shareMaxBitrateBps = (bitrate: ShareBitrate): number => BITRATE_BPS[bitrate];
+
+/**
+ * O que se pede à captura.
+ *
+ * Tudo `ideal` e nada `exact`: uma janela menor que a resolução escolhida deve
+ * ser capturada no tamanho que tem, e não recusada. Pedir só a taxa de quadros
+ * — o que esta função fazia antes — deixava a resolução a critério da
+ * plataforma, e nenhum codificador recupera pixels que a captura não produziu.
+ */
+export const captureConstraintsFor = (quality: ShareQuality): MediaTrackConstraints => {
+  const { width, height } = shareDimensions(quality.resolution);
+  return {
+    width: { ideal: width },
+    height: { ideal: height },
+    frameRate: { ideal: quality.framerate },
+  };
+};
+
+/**
+ * A publicação: uma codificação só, com o teto escolhido por quem transmite
+ * (design D1 de qualidade-escolhida-por-quem-transmite).
+ *
+ * Não há camadas. Com simulcast, quem escolhia o que cada espectador recebia
+ * eram o tamanho da janela dele, a estimativa de banda e o dynacast — e o
+ * resultado medido foi 960×540 numa captura de 1920×1080, sem que quem
+ * transmitia soubesse. Aqui a sala inteira vê o que quem mostra escolheu.
+ */
+export const shareEncodingFor = (
+  quality: ShareQuality,
+): { maxBitrate: number; maxFramerate: number } => ({
+  maxBitrate: shareMaxBitrateBps(quality.bitrate),
+  maxFramerate: quality.framerate,
 });
 
-export interface EncodingLayer {
-  readonly maxBitrateBps: number;
-  readonly maxFramerate: number;
-  readonly scaleDownBy: number;
-}
-
-/**
- * Simulcast layers for screen share. Publishing several qualities at once is
- * what lets a viewer on a weak connection drop to a lower layer without
- * degrading what everyone else receives (specs/screen-sharing).
- *
- * These are starting values. Task 10.5 calibrates them against a real
- * six-person session.
- */
-export function screenShareLayers(kind: ContentKind): EncodingLayer[] {
-  return kind === 'motion'
-    ? [
-        { maxBitrateBps: 5_000_000, maxFramerate: 60, scaleDownBy: 1 },
-        { maxBitrateBps: 1_500_000, maxFramerate: 30, scaleDownBy: 2 },
-      ]
-    : [
-        { maxBitrateBps: 3_000_000, maxFramerate: 15, scaleDownBy: 1 },
-        { maxBitrateBps: 800_000, maxFramerate: 10, scaleDownBy: 2 },
-      ];
-}
+export const DEFAULT_SHARE_QUALITY: ShareQuality = {
+  resolution: '1080p',
+  framerate: 60,
+  bitrate: 'high',
+};
 
 /** Voice needs very little; the ceiling exists to stop the encoder overreaching. */
 export const VOICE_MAX_BITRATE_BPS = 32_000;

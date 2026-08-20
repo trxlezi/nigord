@@ -1,4 +1,5 @@
 import type { ContentKind, DisconnectReason } from '@nigord/shared';
+import type { ShareQuality } from './media.js';
 
 /**
  * The port between session logic and the media transport (design.md D1).
@@ -18,6 +19,11 @@ export interface ConnectOptions {
 export interface ScreenPublishOptions {
   stream: MediaStream;
   contentKind: ContentKind;
+  /**
+   * Resolução, taxa de quadros e teto de bitrate escolhidos por quem
+   * transmite. Não é uma sugestão por espectador: é o que a sala inteira vê.
+   */
+  quality: ShareQuality;
   /** Present only when the platform actually granted system audio. */
   systemAudioTrack: MediaStreamTrack | null;
 }
@@ -61,6 +67,10 @@ export interface RoomClient {
   setMicrophoneEnabled(enabled: boolean): Promise<void>;
 
   publishScreen(options: ScreenPublishOptions): Promise<void>;
+
+  /** Altera a qualidade de uma transmissão em curso, sem republicar a track. */
+  setScreenQuality(quality: ShareQuality): Promise<void>;
+
   unpublishScreen(): Promise<void>;
 
   /**

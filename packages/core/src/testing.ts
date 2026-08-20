@@ -1,4 +1,5 @@
 import type { ContentKind, DisconnectReason } from '@nigord/shared';
+import type { ShareQuality } from './media.js';
 import type {
   ConnectOptions,
   RoomClient,
@@ -22,6 +23,7 @@ export class FakeRoomClient implements RoomClient {
   micDeviceId: string | null = null;
   outputDeviceId: string | null = null;
   screen: ScreenPublishOptions | null = null;
+  screenQuality: ShareQuality | null = null;
   /** Stands in for the local publisher's own video, which has no subscription. */
   localScreen: MediaStream | null = null;
   readonly sentChat: string[] = [];
@@ -62,6 +64,11 @@ export class FakeRoomClient implements RoomClient {
   async publishScreen(options: ScreenPublishOptions): Promise<void> {
     this.calls.push('publishScreen');
     this.screen = options;
+  }
+
+  async setScreenQuality(quality: ShareQuality): Promise<void> {
+    this.calls.push('setScreenQuality');
+    this.screenQuality = quality;
   }
 
   async unpublishScreen(): Promise<void> {
