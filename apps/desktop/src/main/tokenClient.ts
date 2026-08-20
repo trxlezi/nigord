@@ -14,9 +14,9 @@ import {
  */
 export class TokenClient {
   /**
-   * The settings are read at request time, not captured in the constructor: the
-   * participant can change the server or the secret mid-run from the settings
-   * screen, and a client holding a stale copy would keep failing until restart.
+   * As credenciais vêm do build (main/config/connection.ts) e são lidas por
+   * requisição, não capturadas no construtor — em desenvolvimento o ambiente
+   * pode trocá-las entre uma tentativa e outra.
    */
   constructor(private readonly settings: () => { baseUrl: string; groupSecret: string }) {}
 
@@ -24,7 +24,7 @@ export class TokenClient {
     const { baseUrl, groupSecret } = this.settings();
     if (!baseUrl || !groupSecret) {
       throw new Error(
-        encodeTokenFailure('unconfigured', 'Servidor ou segredo do grupo ainda não configurados.'),
+        encodeTokenFailure('unconfigured', 'Build sem servidor ou segredo do grupo embutidos.'),
       );
     }
 

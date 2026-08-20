@@ -31,3 +31,9 @@ jobs:
           # electron-builder publishes to Releases, which is where
           # electron-updater looks for updates.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Endereço e segredo do grupo entram no binário aqui, e não numa tela
+          # de primeira execução: o instalador publicado já sai pronto para
+          # entrar. Definidos como secrets do repositório — trocá-los exige
+          # publicar uma versão nova, que é o preço de não ter a tela.
+          NIGORD_TOKEN_SERVER: ${{ secrets.NIGORD_TOKEN_SERVER }}
+          NIGORD_GROUP_SECRET: ${{ secrets.NIGORD_GROUP_SECRET }}

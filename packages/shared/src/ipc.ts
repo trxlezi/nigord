@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { IpcChannelName, IpcEventNameLiteral } from './ipc-names.js';
 import { captureCapabilitiesSchema, captureRequestSchema, captureSourceSchema } from './capture.js';
-import { clientConfigPatchSchema, clientConfigSchema } from './config.js';
 import { preferencesSchema } from './preferences.js';
 import { tokenResponseSchema } from './token.js';
 
@@ -52,15 +51,6 @@ export const ipcContract = {
   'prefs:set': {
     request: preferencesSchema.partial(),
     response: preferencesSchema,
-  },
-  'config:get': {
-    request: emptySchema,
-    response: clientConfigSchema,
-  },
-  'config:set': {
-    request: clientConfigPatchSchema,
-    /** The secret is never echoed back — only whether one is now stored. */
-    response: clientConfigSchema,
   },
   'token:request': {
     request: z.object({ room: z.string(), identity: z.string() }),
